@@ -34,6 +34,13 @@ def _error_message(code: str) -> str:
     return t(key) if key else ""
 
 
+def _escape_markdown_text(text: str) -> str:
+    """Escape user/model controlled text for Telegram legacy Markdown."""
+    for ch in "\\`*_[":
+        text = text.replace(ch, "\\" + ch)
+    return text
+
+
 def _format_reply(result: dict) -> str:
     """Turn a core.processor result dict into a Markdown Telegram message."""
     error = result.get("error")
@@ -52,7 +59,7 @@ def _format_reply(result: dict) -> str:
 
     parts: list[str] = []
     if reply:
-        parts.append(reply)
+        parts.append(_escape_markdown_text(reply))
 
     if executed:
         parts.append("")  # blank line between reply and action list
@@ -84,12 +91,12 @@ async def _dispatch(update, context, transcript: str, status_msg=None):
 
     if status_msg:
         try:
-            sent = await status_msg.edit_text(early_text, parse_mode="Markdown")
+            sent = await status_msg.edit_text(early_text)
         except Exception:
             sent = await status_msg.edit_text(early_text)
     else:
         try:
-            sent = await update.message.reply_text(early_text, parse_mode="Markdown")
+            sent = await update.message.reply_text(early_text)
         except Exception:
             sent = await update.message.reply_text(early_text)
 

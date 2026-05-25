@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.7 - 2026-05-25
+
+- Made LLM command parsing safer and more consistent.
+- Sanitized execution history so internal `[OK]` logs are not copied into replies.
+- Added action validation, shared JSON retry handling, and safer follow-up history.
+
 ## 1.2.7 — 2026-05-09
 
 - Depersonalised the system prompts: all setup-specific examples (personal names, pool, upstairs/downstairs, blinds, room labels) removed from `prompts_de.yaml` and `prompts_en.yaml`. Only the universal HA contract remains (JSON schema, action names, domains, service_data).

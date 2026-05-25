@@ -3,6 +3,8 @@ import yaml
 import json
 import re
 import logging
+import threading
+import uuid
 from pathlib import Path
 from core.config import (
     LMSTUDIO_URL, LMSTUDIO_MODEL, LMSTUDIO_TIMEOUT, LMSTUDIO_API_KEY,
@@ -18,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 # Gesprächsverlauf pro chat_id — nur aktiv wenn LLM_HISTORY_SIZE > 0
 _history: dict[int, list] = {}
+_history_lock = threading.RLock()
+
+_STANDARD_DOMAIN_ACTIONS: dict[str, set[str]] = {
+    "climate": {"set_temperature", "set_hvac_mode"},
+    "cover": {"set_cover_position"},
+    "fan": {"set_percentage"},
+    "light": {"turn_on", "turn_off", "toggle"},
+    "switch": {"turn_on", "turn_off", "toggle"},
+    "automation": {"trigger"},
+    "input_boolean": {"turn_on", "turn_off", "toggle"},
+    "script": {"turn_on"},
+    "scene": {"turn_on"},
+    "button": {"turn_on"},
+    "media_player": {"turn_on", "turn_off"},
+    "lock": {"turn_on", "turn_off"},
+    "group": {"turn_on", "turn_off", "toggle"},
+}
 
 
 def _extract_json(text: str) -> dict | None:
@@ -60,6 +79,63 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
+def _looks_like_execution_summary(text: str) -> bool:
+    """Return true when model output imitates our internal execution receipt."""
+    marker = re.escape(t("exec_summary_marker"))
+    ok = re.escape(t("exec_status_ok"))
+    error = re.escape(t("exec_status_error"))
+    timeout = re.escape(t("exec_status_timeout"))
+    return bool(
+        re.search(rf"(^|\n)\s*{marker}\s+", text, flags=re.IGNORECASE)
+        or re.search(rf"({ok}|{error}|{timeout})", text)
+    )
+
+
+def _execution_context_from_summary(line: str) -> str | None:
+    """Convert an internal execution summary into LLM-safe context text."""
+    marker = t("exec_summary_marker")
+    stripped = (line or "").strip()
+    if not stripped.lower().startswith(marker.lower()):
+        return None
+
+    status_map = {
+        t("exec_status_ok"): t("exec_context_success"),
+        t("exec_status_error"): t("exec_context_error"),
+        t("exec_status_timeout"): t("exec_context_timeout"),
+    }
+    status_pattern = "|".join(re.escape(status) for status in status_map)
+    body = stripped[len(marker):].strip()
+    items: list[str] = []
+
+    for match in re.finditer(rf"\s*(?P<body>.*?)(?P<status>{status_pattern})(?:,\s*|$)", body):
+        action_body = match.group("body").strip().rstrip(",").strip()
+        status = status_map.get(match.group("status"), match.group("status"))
+        if " -> " not in action_body:
+            continue
+        action, entity_part = action_body.split(" -> ", 1)
+        entity_id = entity_part.strip().split(" ", 1)[0]
+        if not action or not entity_id:
+            continue
+        items.append(t("exec_context_item", status=status, action=action.strip(), entity_id=entity_id))
+
+    if not items:
+        return None
+    return t("exec_context_prefix") + " " + "; ".join(items)
+
+
+def _sanitize_execution_summaries(text: str, include_execution_summaries: bool = True) -> str:
+    """Replace internal execution receipts with compact LLM-safe context lines."""
+    lines: list[str] = []
+    for line in (text or "").splitlines():
+        context = _execution_context_from_summary(line)
+        if context:
+            if include_execution_summaries:
+                lines.append(context)
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
 def _lmstudio_headers() -> dict:
     """Standard-Header fuer LM Studio /v1-Calls. Fuegt Bearer-Token an,
     wenn LM Studio Server-Auth aktiv ist (sobald MCP genutzt wird Pflicht)."""
@@ -67,6 +143,160 @@ def _lmstudio_headers() -> dict:
     if LMSTUDIO_API_KEY:
         h["Authorization"] = f"Bearer {LMSTUDIO_API_KEY}"
     return h
+
+
+def _new_turn_id() -> str:
+    return uuid.uuid4().hex
+
+
+def _call_llm_json(
+    label: str,
+    system_prompt: str,
+    history: list,
+    user_content: str,
+    *,
+    allow_plain_text_reply: bool = False,
+) -> dict | None:
+    endpoint = f"{LMSTUDIO_URL}/v1/chat/completions"
+    payload = {
+        "model": LMSTUDIO_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            *_clean_history_for_llm(history),
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": LMSTUDIO_TEMPERATURE,
+    }
+    response = requests.post(endpoint, json=payload, headers=_lmstudio_headers(), timeout=LMSTUDIO_TIMEOUT)
+    response.raise_for_status()
+    content = response.json()["choices"][0]["message"]["content"]
+    logger.info(f"[{label}] Antwort raw: {content}")
+
+    result = _extract_json(content)
+    if result is not None:
+        return result
+
+    stripped = (content or "").strip()
+    if not stripped:
+        logger.error(f"[{label}] Kein JSON und leere Antwort")
+        return None
+
+    logger.warning(f"[{label}] Kein JSON — starte strikten JSON-Retry")
+    retry_system = system_prompt + "\n\n" + _build_prompt("json_retry")
+    retry_payload = {
+        "model": LMSTUDIO_MODEL,
+        "messages": [
+            {"role": "system", "content": retry_system},
+            *_clean_history_for_llm(history, include_execution_summaries=False),
+            {"role": "user", "content": user_content},
+        ],
+        "temperature": 0,
+    }
+    retry_response = requests.post(
+        endpoint, json=retry_payload, headers=_lmstudio_headers(), timeout=LMSTUDIO_TIMEOUT
+    )
+    retry_response.raise_for_status()
+    retry_content = retry_response.json()["choices"][0]["message"]["content"]
+    logger.info(f"[{label}] Antwort raw retry: {retry_content}")
+
+    result = _extract_json(retry_content)
+    if result is not None:
+        return result
+
+    if _looks_like_execution_summary(stripped) or _looks_like_execution_summary(retry_content):
+        logger.error(f"[{label}] Kein JSON; Antwort imitiert Ausfuehrungsstatus — verwerfe")
+        return None
+
+    if allow_plain_text_reply:
+        logger.warning(f"[{label}] Kein JSON nach Retry — verwende plain text als reply: '{stripped}'")
+        return {"reply": stripped, "actions": [], "clarification_question": ""}
+
+    logger.error(f"[{label}] Kein JSON nach Retry")
+    return None
+
+
+def _entity_actions_map(entities: list[dict], id_key: str = "id") -> dict[str, set[str]]:
+    out: dict[str, set[str]] = {}
+    for e in entities:
+        eid = e.get(id_key)
+        if not eid:
+            continue
+        out[eid] = set(e.get("actions") or [])
+    return out
+
+
+def _validate_actions(
+    result: dict,
+    valid_ids: set[str],
+    allowed_actions: dict[str, set[str]],
+    label: str,
+    *,
+    allow_get_state: bool = False,
+    allow_domain_defaults: bool = False,
+) -> list[dict]:
+    validated: list[dict] = []
+    for act in result.get("actions", []):
+        action = act.get("action")
+        eid = act.get("entity_id")
+        if action == "needs_fallback":
+            validated.append(act)
+            logger.info(f"[{label}] needs_fallback fuer '{eid or '?'}'")
+            continue
+        if action == "get_state" and not allow_get_state:
+            logger.warning(f"[{label}] get_state ist kein HA-Service — Action ignoriert")
+            continue
+        if not eid:
+            continue
+        if eid not in valid_ids:
+            logger.warning(f"[{label}] Halluzinierte Entity '{eid}' - ignoriert")
+            continue
+        if not act.get("domain") and "." in eid:
+            act["domain"] = eid.split(".", 1)[0]
+        domain = act.get("domain") or (eid.split(".", 1)[0] if "." in eid else "")
+        allowed = set(allowed_actions.get(eid) or [])
+        if allow_domain_defaults:
+            allowed.update(_STANDARD_DOMAIN_ACTIONS.get(domain, set()))
+        if action not in allowed:
+            logger.warning(
+                f"[{label}] Nicht erlaubte Action '{action}' fuer '{eid}' "
+                f"(erlaubt: {sorted(allowed) or '-'}) - ignoriert"
+            )
+            continue
+        sd = act.get("service_data")
+        if sd is not None and not isinstance(sd, dict):
+            logger.warning(f"[{label}] service_data fuer '{eid}' kein Dict - verwerfe")
+            act.pop("service_data", None)
+        validated.append(act)
+    return validated
+
+
+def _apply_action_limit(actions: list[dict], label: str) -> list[dict]:
+    if MAX_ACTIONS_PER_COMMAND > 0 and len(actions) > MAX_ACTIONS_PER_COMMAND:
+        logger.warning(
+            f"[{label}] Zu viele Aktionen ({len(actions)}), "
+            f"begrenze auf {MAX_ACTIONS_PER_COMMAND}"
+        )
+        for i in range(MAX_ACTIONS_PER_COMMAND, len(actions)):
+            actions[i]["ignored"] = True
+    return actions
+
+
+def _store_history_turn(chat_id: int, transcript: str, result: dict, assistant_content: str) -> str:
+    turn_id = _new_turn_id()
+    if LLM_HISTORY_SIZE <= 0 or chat_id == 0:
+        return turn_id
+    with _history_lock:
+        history = list(_history.get(chat_id, []))
+        history.append({"role": "user", "content": transcript, "turn_id": turn_id})
+        if HISTORY_INCLUDE_ASSISTANT:
+            history.append({"role": "assistant", "content": assistant_content, "turn_id": turn_id})
+        max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
+        if len(history) > max_entries:
+            history = history[-max_entries:]
+        _history[chat_id] = history
+    result["_history_turn_id"] = turn_id
+    logger.info(f"[LLM] History fuer chat {chat_id}: {len(_history.get(chat_id, []))} Eintraege gespeichert")
+    return turn_id
 
 
 def _load_entities() -> list:
@@ -164,6 +394,7 @@ def _format_curated_entity_with_state(e: dict, ha_state: dict | None) -> str:
 def parse_command(transcript: str, chat_id: int = 0) -> dict | None:
     entities = _load_entities()
     valid_ids = {e["id"] for e in entities}
+    allowed_actions = _entity_actions_map(entities, "id")
 
     # Live states parallel for all curated entities so the parser can answer
     # status questions directly (no get_state -> needs_fallback round-trip).
@@ -193,31 +424,12 @@ def parse_command(transcript: str, chat_id: int = 0) -> dict | None:
     # History aufbauen (nur wenn aktiviert)
     history = []
     if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-        history = _history.get(chat_id, [])
+        with _history_lock:
+            history = list(_history.get(chat_id, []))
 
     try:
-        endpoint = f"{LMSTUDIO_URL}/v1/chat/completions"
-
-        payload = {
-            "model": LMSTUDIO_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                *_clean_history_for_llm(history),
-                {"role": "user", "content": transcript}
-            ],
-            "temperature": LMSTUDIO_TEMPERATURE
-        }
-
-        response = requests.post(endpoint, json=payload, headers=_lmstudio_headers(), timeout=LMSTUDIO_TIMEOUT)
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-
-        logger.info(f"[LLM] Antwort raw: {content}")
-
-        result = _extract_json(content)
+        result = _call_llm_json("LLM", system_prompt, history, transcript)
         if result is None:
-            logger.error("[LLM] Kein JSON gefunden")
             return None
         logger.info(f"[LLM] Parsed: {result}")
 
@@ -226,57 +438,20 @@ def parse_command(transcript: str, chat_id: int = 0) -> dict | None:
             logger.info(f"[LLM] Clarification vom Parser: '{clarification_q}'")
         result["clarification_question"] = clarification_q
 
-        # Alle entity_ids gegen entities.yaml validieren.
-        # "needs_fallback" ist ein Steuersignal, kein echter HA-Aufruf - immer durchlassen.
-        validated_actions: list[dict] = []
-        for act in result.get("actions", []):
-            if act.get("action") == "needs_fallback":
-                validated_actions.append(act)
-                logger.info(f"[LLM] needs_fallback fuer '{act.get('entity_id', '?')}'")
-                continue
-            eid = act.get("entity_id")
-            if not eid:
-                continue
-            if eid not in valid_ids:
-                logger.warning(f"[LLM] Halluzinierte Entity '{eid}' - wird ignoriert")
-                continue
-            if not act.get("domain") and "." in eid:
-                act["domain"] = eid.split(".", 1)[0]
-            sd = act.get("service_data")
-            if sd is not None and not isinstance(sd, dict):
-                logger.warning(f"[LLM] service_data fuer '{eid}' kein Dict - verwerfe")
-                act.pop("service_data", None)
-            validated_actions.append(act)
-
-        # Limit anwenden und ignorierte Actions markieren
-        if MAX_ACTIONS_PER_COMMAND > 0 and len(validated_actions) > MAX_ACTIONS_PER_COMMAND:
-            logger.warning(
-                f"[LLM] Zu viele Aktionen ({len(validated_actions)}), "
-                f"begrenze auf {MAX_ACTIONS_PER_COMMAND}"
-            )
-            
-            # Die ersten N bleiben normal, der Rest bekommt "ignored": True
-            for i in range(MAX_ACTIONS_PER_COMMAND, len(validated_actions)):
-                validated_actions[i]["ignored"] = True
-
-        result["actions"] = validated_actions
+        result["actions"] = _apply_action_limit(
+            _validate_actions(result, valid_ids, allowed_actions, "LLM"),
+            "LLM",
+        )
 
         # History speichern (nur wenn aktiviert).
         # Assistant-Turn nur speichern wenn HISTORY_INCLUDE_ASSISTANT=true.
         if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-            history.append({"role": "user", "content": transcript})
-            if HISTORY_INCLUDE_ASSISTANT:
-                history.append({"role": "assistant", "content": content})
-            max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
-            if len(history) > max_entries:
-                history = history[-max_entries:]
-            _history[chat_id] = history
-            logger.info(f"[LLM] History fuer chat {chat_id}: {len(history)} Eintraege gespeichert")
+            _store_history_turn(chat_id, transcript, result, json.dumps(result, ensure_ascii=False))
 
         return result
 
     except requests.exceptions.HTTPError as e:
-        logger.error(f"[LLM] HTTP-Fehler: {e} - Response: {response.text}")
+        logger.error(f"[LLM] HTTP-Fehler: {e}")
         return None
     except json.JSONDecodeError as e:
         logger.error(f"[LLM] Fehler beim Parsen des JSONs: {e}")
@@ -290,17 +465,19 @@ def get_history_snapshot(chat_id: int) -> list:
     """Return a shallow copy of the stored history before the current turn is added."""
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0:
         return []
-    return list(_history.get(chat_id, []))
+    with _history_lock:
+        return [dict(m) for m in _history.get(chat_id, [])]
 
 
 def get_recent_user_messages(chat_id: int) -> list[str]:
     """Return all stored user messages from history for this chat (oldest first)."""
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0:
         return []
-    return [m["content"] for m in _history.get(chat_id, []) if m["role"] == "user"]
+    with _history_lock:
+        return [m["content"] for m in _history.get(chat_id, []) if m["role"] == "user"]
 
 
-def _clean_history_for_llm(history: list) -> list:
+def _clean_history_for_llm(history: list, include_execution_summaries: bool = True) -> list:
     """Return history with assistant turns converted to plain German text.
 
     Raw LLM JSON in assistant turns confuses small models — they start echoing
@@ -326,9 +503,31 @@ def _clean_history_for_llm(history: list) -> list:
         if not reply_text:
             reply_text = trailing
             trailing = ""
+        if trailing:
+            trailing = _sanitize_execution_summaries(trailing, include_execution_summaries)
         text = reply_text + ("\n" + trailing if trailing else "")
         cleaned.append({**m, "content": text or content})
     return cleaned
+
+
+def format_history_block_for_llm(history: list) -> str:
+    """Return the same sanitized history view as parser messages, as a text block."""
+    cleaned = _clean_history_for_llm(history)
+    if not cleaned:
+        return t("history_empty")
+    lines: list[str] = []
+    user_label = t("history_user_label")
+    assistant_label = t("history_assistant_label")
+    for m in cleaned:
+        role = m.get("role", "")
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "user":
+            lines.append(f"{user_label} {content}")
+        elif role == "assistant" and HISTORY_INCLUDE_ASSISTANT:
+            lines.append(f"{assistant_label} {content}")
+    return "\n".join(lines) if lines else t("history_empty")
 
 
 def get_history_entity_ids(chat_id: int) -> list[str]:
@@ -341,7 +540,9 @@ def get_history_entity_ids(chat_id: int) -> list[str]:
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0:
         return []
     seen: list[str] = []
-    for m in _history.get(chat_id, []):
+    with _history_lock:
+        history = list(_history.get(chat_id, []))
+    for m in history:
         if m["role"] != "assistant":
             continue
         match = re.search(r'\{.*\}', m["content"], re.DOTALL)
@@ -367,7 +568,9 @@ def get_recent_assistant_replies(chat_id: int) -> list[str]:
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0:
         return []
     out: list[str] = []
-    for m in _history.get(chat_id, []):
+    with _history_lock:
+        history = list(_history.get(chat_id, []))
+    for m in history:
         if m["role"] != "assistant":
             continue
         content = m["content"]
@@ -382,7 +585,9 @@ def get_recent_assistant_replies(chat_id: int) -> list[str]:
                 pass
             trailing = content[match.end():].strip()
             if trailing:
-                out.append(trailing)
+                safe_trailing = _sanitize_execution_summaries(trailing)
+                if safe_trailing:
+                    out.append(safe_trailing)
         else:
             stripped = content.strip()
             if stripped:
@@ -390,7 +595,7 @@ def get_recent_assistant_replies(chat_id: int) -> list[str]:
     return out
 
 
-def append_execution_summary(chat_id: int, summary: str) -> None:
+def append_execution_summary(chat_id: int, summary: str, turn_id: str | None = None) -> None:
     """Append an execution-summary line to the most recent assistant entry in history.
 
     Called from handlers.py after actions run. No-op if history is disabled,
@@ -398,13 +603,23 @@ def append_execution_summary(chat_id: int, summary: str) -> None:
     """
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0 or not summary:
         return
-    history = _history.get(chat_id)
-    if not history:
-        return
-    for msg in reversed(history):
-        if msg["role"] == "assistant":
-            msg["content"] = msg["content"].rstrip() + "\n" + summary
+    with _history_lock:
+        history = _history.get(chat_id)
+        if not history:
             return
+        target = None
+        if turn_id:
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and msg.get("turn_id") == turn_id:
+                    target = msg
+                    break
+        if target is None:
+            for msg in reversed(history):
+                if msg["role"] == "assistant":
+                    target = msg
+                    break
+        if target is not None:
+            target["content"] = target["content"].rstrip() + "\n" + summary
 
 
 def append_clarification_turn(chat_id: int, transcript: str, question: str) -> None:
@@ -416,14 +631,16 @@ def append_clarification_turn(chat_id: int, transcript: str, question: str) -> N
     """
     if LLM_HISTORY_SIZE <= 0 or chat_id == 0 or not transcript:
         return
-    history = _history.get(chat_id, [])
-    history.append({"role": "user", "content": transcript})
-    if HISTORY_INCLUDE_ASSISTANT and question:
-        history.append({"role": "assistant", "content": question})
-    max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
-    if len(history) > max_entries:
-        history = history[-max_entries:]
-    _history[chat_id] = history
+    turn_id = _new_turn_id()
+    with _history_lock:
+        history = list(_history.get(chat_id, []))
+        history.append({"role": "user", "content": transcript, "turn_id": turn_id})
+        if HISTORY_INCLUDE_ASSISTANT and question:
+            history.append({"role": "assistant", "content": question, "turn_id": turn_id})
+        max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
+        if len(history) > max_entries:
+            history = history[-max_entries:]
+        _history[chat_id] = history
     logger.info(f"[LLM] Clarification-Turn fuer chat {chat_id} gespeichert ({len(history)} Eintraege)")
 
 
@@ -443,7 +660,8 @@ def smalltalk_reply(transcript: str, chat_id: int = 0) -> str | None:
 
     history = []
     if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-        history = _history.get(chat_id, [])
+        with _history_lock:
+            history = list(_history.get(chat_id, []))
 
     logger.info(
         f"[LLM Smalltalk] Transcript: '{transcript}' | Modell: {LMSTUDIO_MODEL} | "
@@ -478,13 +696,16 @@ def smalltalk_reply(transcript: str, chat_id: int = 0) -> str | None:
         logger.info(f"[LLM Smalltalk] Antwort: {content}")
 
         if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-            history.append({"role": "user", "content": transcript})
-            if HISTORY_INCLUDE_ASSISTANT:
-                history.append({"role": "assistant", "content": content})
-            max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
-            if len(history) > max_entries:
-                history = history[-max_entries:]
-            _history[chat_id] = history
+            turn_id = _new_turn_id()
+            with _history_lock:
+                history = list(_history.get(chat_id, []))
+                history.append({"role": "user", "content": transcript, "turn_id": turn_id})
+                if HISTORY_INCLUDE_ASSISTANT:
+                    history.append({"role": "assistant", "content": content, "turn_id": turn_id})
+                max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
+                if len(history) > max_entries:
+                    history = history[-max_entries:]
+                _history[chat_id] = history
 
         return content
 
@@ -593,6 +814,7 @@ def parse_command_rag(transcript: str, entities: list[dict], chat_id: int = 0, r
         return None
 
     valid_ids = {e["entity_id"] for e in entities}
+    allowed_actions = _entity_actions_map(entities, "entity_id")
 
     # States parallel fuer alle Kandidaten holen — verspaetete Imports gegen Zyklen.
     from core.ha import get_states_bulk
@@ -606,7 +828,8 @@ def parse_command_rag(transcript: str, entities: list[dict], chat_id: int = 0, r
     # History aufbauen (gleiche Logik wie parse_command)
     history = []
     if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-        history = _history.get(chat_id, [])
+        with _history_lock:
+            history = list(_history.get(chat_id, []))
 
     logger.info(
         f"[LLM RAG] Transcript: '{transcript}' | Entities: {len(entities)} | "
@@ -616,31 +839,15 @@ def parse_command_rag(transcript: str, entities: list[dict], chat_id: int = 0, r
     user_content = rewriter_query if rewriter_query else transcript
 
     try:
-        endpoint = f"{LMSTUDIO_URL}/v1/chat/completions"
-        payload = {
-            "model": LMSTUDIO_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                *_clean_history_for_llm(history),
-                {"role": "user", "content": user_content},
-            ],
-            "temperature": LMSTUDIO_TEMPERATURE,
-        }
-        response = requests.post(endpoint, json=payload, headers=_lmstudio_headers(), timeout=LMSTUDIO_TIMEOUT)
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        logger.info(f"[LLM RAG] Antwort raw: {content}")
-
-        result = _extract_json(content)
+        result = _call_llm_json(
+            "LLM RAG",
+            system_prompt,
+            history,
+            user_content,
+            allow_plain_text_reply=True,
+        )
         if result is None:
-            # Fix 1: plain text als reply wrappen statt None zurueckgeben
-            stripped = content.strip()
-            if stripped:
-                logger.warning(f"[LLM RAG] Kein JSON — verwende plain text als reply: '{stripped}'")
-                result = {"reply": stripped, "actions": [], "clarification_question": ""}
-            else:
-                logger.error("[LLM RAG] Kein JSON und leere Antwort")
-                return None
+            return None
 
         logger.info(f"[LLM RAG] Parsed: {result}")
 
@@ -649,38 +856,10 @@ def parse_command_rag(transcript: str, entities: list[dict], chat_id: int = 0, r
             logger.info(f"[LLM RAG] Clarification vom Parser: '{clarification_q}'")
         result["clarification_question"] = clarification_q
 
-        validated: list[dict] = []
-        for act in result.get("actions", []):
-            eid = act.get("entity_id")
-            if act.get("action") == "needs_fallback":
-                validated.append(act)
-                logger.info(f"[LLM RAG] needs_fallback fuer '{eid or '?'}'")
-                continue
-            if act.get("action") == "get_state":
-                logger.warning(f"[LLM RAG] get_state ist kein HA-Service — Action ignoriert (State ist bereits im Entity-Kontext)")
-                continue
-            if not eid:
-                continue
-            if eid not in valid_ids:
-                logger.warning(f"[LLM RAG] Halluzinierte Entity '{eid}' – ignoriert")
-                continue
-            if not act.get("domain") and "." in eid:
-                act["domain"] = eid.split(".", 1)[0]
-            sd = act.get("service_data")
-            if sd is not None and not isinstance(sd, dict):
-                logger.warning(f"[LLM RAG] service_data fuer '{eid}' kein Dict — verwerfe")
-                act.pop("service_data", None)
-            validated.append(act)
-
-        if MAX_ACTIONS_PER_COMMAND > 0 and len(validated) > MAX_ACTIONS_PER_COMMAND:
-            logger.warning(
-                f"[LLM RAG] Zu viele Aktionen ({len(validated)}), "
-                f"begrenze auf {MAX_ACTIONS_PER_COMMAND}"
-            )
-            for i in range(MAX_ACTIONS_PER_COMMAND, len(validated)):
-                validated[i]["ignored"] = True
-
-        result["actions"] = validated
+        result["actions"] = _apply_action_limit(
+            _validate_actions(result, valid_ids, allowed_actions, "LLM RAG"),
+            "LLM RAG",
+        )
 
         # History speichern (gleiche Logik wie parse_command).
         # Assistant-Turn nur speichern wenn HISTORY_INCLUDE_ASSISTANT=true.
@@ -688,15 +867,7 @@ def parse_command_rag(transcript: str, entities: list[dict], chat_id: int = 0, r
         # History, nicht den rohen content — so tauchen abgelehnte entity_ids
         # nicht in get_history_entity_ids() auf.
         if LLM_HISTORY_SIZE > 0 and chat_id != 0:
-            history.append({"role": "user", "content": transcript})
-            if HISTORY_INCLUDE_ASSISTANT:
-                history_content = json.dumps(result, ensure_ascii=False)
-                history.append({"role": "assistant", "content": history_content})
-            max_entries = LLM_HISTORY_SIZE * (2 if HISTORY_INCLUDE_ASSISTANT else 1)
-            if len(history) > max_entries:
-                history = history[-max_entries:]
-            _history[chat_id] = history
-            logger.info(f"[LLM RAG] History fuer chat {chat_id}: {len(history)} Eintraege gespeichert")
+            _store_history_turn(chat_id, transcript, result, json.dumps(result, ensure_ascii=False))
 
         return result
 
@@ -724,6 +895,10 @@ def parse_command_with_states(transcript: str, states: list[dict], chat_id: int 
         return None
 
     valid_ids = {s["entity_id"] for s in states}
+    allowed_actions = {
+        s["entity_id"]: set(_STANDARD_DOMAIN_ACTIONS.get(s.get("domain", ""), set()))
+        for s in states
+    }
 
     entity_list = "\n".join(
         f'- {s["entity_id"]} | name: {s.get("friendly_name") or "-"} | '
@@ -741,56 +916,20 @@ def parse_command_with_states(transcript: str, states: list[dict], chat_id: int 
     )
 
     try:
-        endpoint = f"{LMSTUDIO_URL}/v1/chat/completions"
-        payload = {
-            "model": LMSTUDIO_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                *_clean_history_for_llm(history),
-                {"role": "user", "content": transcript},
-            ],
-            "temperature": LMSTUDIO_TEMPERATURE,
-        }
-        response = requests.post(endpoint, json=payload, headers=_lmstudio_headers(), timeout=LMSTUDIO_TIMEOUT)
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        logger.info(f"[LLM Fallback REST] Antwort raw: {content}")
-
-        result = _extract_json(content)
+        result = _call_llm_json("LLM Fallback REST", system_prompt, history, transcript)
         if result is None:
-            logger.error("[LLM Fallback REST] Kein JSON gefunden")
             return None
 
-        validated: list[dict] = []
-        for act in result.get("actions", []):
-            eid = act.get("entity_id")
-            if act.get("action") == "needs_fallback":
-                validated.append(act)
-                logger.info(f"[LLM Fallback REST] needs_fallback fuer '{eid or '?'}'")
-                continue
-            if not eid:
-                continue
-            if eid not in valid_ids:
-                logger.warning(f"[LLM Fallback REST] Halluzinierte Entity '{eid}' - ignoriert")
-                continue
-            # domain nachziehen falls das Modell sie nicht geliefert hat
-            if not act.get("domain") and "." in eid:
-                act["domain"] = eid.split(".", 1)[0]
-            sd = act.get("service_data")
-            if sd is not None and not isinstance(sd, dict):
-                logger.warning(f"[LLM Fallback REST] service_data fuer '{eid}' kein Dict — verwerfe")
-                act.pop("service_data", None)
-            validated.append(act)
-
-        if MAX_ACTIONS_PER_COMMAND > 0 and len(validated) > MAX_ACTIONS_PER_COMMAND:
-            logger.warning(
-                f"[LLM Fallback REST] Zu viele Aktionen ({len(validated)}), "
-                f"begrenze auf {MAX_ACTIONS_PER_COMMAND}"
-            )
-            for i in range(MAX_ACTIONS_PER_COMMAND, len(validated)):
-                validated[i]["ignored"] = True
-
-        result["actions"] = validated
+        result["actions"] = _apply_action_limit(
+            _validate_actions(
+                result,
+                valid_ids,
+                allowed_actions,
+                "LLM Fallback REST",
+                allow_domain_defaults=True,
+            ),
+            "LLM Fallback REST",
+        )
         return result
 
     except requests.exceptions.HTTPError as e:

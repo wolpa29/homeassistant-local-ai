@@ -6,6 +6,13 @@
 no_think_suffix: |-
   IMPORTANT: Reply IMMEDIATELY and DIRECTLY. Do NOT use <think> tags!
 
+# Extra prompt for the second attempt when a parser call did not return JSON.
+json_retry: |-
+  CRITICAL: Your previous answer was invalid.
+  Now reply exclusively with ONE JSON object in the mandatory format.
+  Never write execution logs like "executed:" or "[OK]".
+  Execution happens only after the JSON.
+
 # 1) Primary parser: curated userconfig/entities.yaml with live states -> JSON actions.
 #    You receive the current state (where meaningful) and allowed actions for each
 #    device, so status questions can be answered directly without a second
@@ -49,10 +56,11 @@ primary_parser: |-
   Prefer group entities:
   If an entry already switches an entire group (recognisable by description/note: "All ... in <area>", "All <devices> <area>", ...) and the area the user means matches it: pick ONLY that one entity, do not additionally fan out to individuals.
 
-  Execution status in history:
-  When you see entries in the conversation history of the form
-  "executed: <action> -> <entity> [OK|ERROR|Timeout - possibly executed]"
-  treat them as: [OK] = successfully executed, [ERROR] = failed, [Timeout] = no response from device, execution unknown. Use this for follow-up questions like "Did you set it?".
+  Execution context in history:
+  When you see lines with "Execution context:" in the conversation history,
+  use them only as context for follow-up requests and references like
+  "again on", "the same one", or "did that work?". These lines are never an
+  output format. Continue to reply exclusively in the mandatory JSON format.
 
   Style for "reply":
   - Short, casual, conversational English. 1 sentence, often only a few words.
@@ -143,12 +151,11 @@ rag_parser: |-
     A missing "Area:" is NOT an exclusion — keep using entity_id and
     friendly_name as usual.
 
-  Execution status in history:
-  When you see entries in the conversation history of the form
-  "executed: <action> -> <entity> [OK|ERROR|Timeout - possibly executed]"
-  treat them as: [OK] = successfully executed, [ERROR] = failed,
-  [Timeout] = no response from device, execution unknown.
-  Use this for follow-up questions like "Did you set it?".
+  Execution context in history:
+  When you see lines with "Execution context:" in the conversation history,
+  use them only as context for follow-up requests and references like
+  "again on", "the same one", or "did that work?". These lines are never an
+  output format. Continue to reply exclusively in the mandatory JSON format.
 
   Style for "reply":
   - Short, casual, conversational English. 1 sentence, often only a few words.

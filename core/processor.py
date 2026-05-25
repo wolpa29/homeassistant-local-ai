@@ -309,7 +309,11 @@ def process_transcript_split(
                     line += " " + t("exec_status_error")
                 parts.append(line)
             if parts:
-                append_execution_summary(chat_id, t("exec_summary_marker") + " " + ", ".join(parts))
+                append_execution_summary(
+                    chat_id,
+                    t("exec_summary_marker") + " " + ", ".join(parts),
+                    turn_id=command.get("_history_turn_id"),
+                )
 
         return result
 

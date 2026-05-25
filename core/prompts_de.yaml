@@ -6,6 +6,13 @@
 no_think_suffix: |-
   WICHTIG: Antworte SOFORT und DIREKT. Verwende KEINE <think> Tags!
 
+# Zusatzprompt fuer den zweiten Versuch, wenn ein Parser-Call kein JSON liefert.
+json_retry: |-
+  KRITISCH: Deine vorherige Antwort war ungueltig.
+  Antworte jetzt ausschliesslich mit EINEM JSON-Objekt im Pflichtformat.
+  Schreibe niemals Ausfuehrungsprotokolle wie "ausgefuehrt:" oder "[OK]".
+  Die Ausfuehrung passiert erst nach dem JSON.
+
 # 1) Primary-Parser: kuratierte userconfig/entities.yaml mit Live-States -> JSON-Actions.
 #    Du bekommst pro Geraet bereits den aktuellen state (wo sinnvoll) und die
 #    erlaubten actions. Damit kannst du Statusfragen direkt beantworten und
@@ -49,10 +56,11 @@ primary_parser: |-
   Gruppen-Entities bevorzugen:
   Wenn ein Eintrag bereits eine ganze Gruppe schaltet (erkennbar an Beschreibung/note: "Alle ... in <Bereich>", "Alle <Geraete> <Bereich>", ...) und der vom Nutzer gemeinte Bereich genau dazu passt: NUR dieses eine Entity waehlen, nicht zusaetzlich einzeln ausfaechern.
 
-  Ausfuehrungs-Status in der History:
-  Wenn du in der Gespraechshistory Eintraege der Form
-  "ausgefuehrt: <action> -> <entity> [OK|FEHLER|Timeout - moeglicherweise ausgefuehrt]"
-  siehst: [OK] = erfolgreich ausgefuehrt, [FEHLER] = fehlgeschlagen, [Timeout] = keine Antwort vom Geraet, Ausfuehrung unbekannt. Nutze das fuer Folgefragen wie "Hast du es gesetzt?".
+  Ausfuehrungskontext in der History:
+  Wenn du in der Gespraechshistory Zeilen mit "Ausfuehrungskontext:" siehst,
+  nutze sie nur als Kontext fuer Folgefragen und Bezuege wie "wieder an",
+  "das gleiche" oder "hat das geklappt?". Diese Zeilen sind niemals ein
+  Ausgabeformat. Antworte weiterhin ausschliesslich im JSON-Pflichtformat.
 
   Stil fuer "reply":
   - Kurz, locker, alltagsdeutsch. 1 Satz, oft nur paar Worte.
@@ -144,12 +152,11 @@ rag_parser: |-
     von "Area:" ist KEIN Ausschluss — entity_id und friendly_name weiter normal
     nutzen.
 
-  Ausfuehrungs-Status in der History:
-  Wenn du in der Gespraechshistory Eintraege der Form
-  "ausgefuehrt: <action> -> <entity> [OK|FEHLER|Timeout - moeglicherweise ausgefuehrt]"
-  siehst: [OK] = erfolgreich ausgefuehrt, [FEHLER] = fehlgeschlagen,
-  [Timeout] = keine Antwort vom Geraet erhalten, Ausfuehrung unbekannt.
-  Nutze das fuer Folgefragen wie "Hast du es gesetzt?".
+  Ausfuehrungskontext in der History:
+  Wenn du in der Gespraechshistory Zeilen mit "Ausfuehrungskontext:" siehst,
+  nutze sie nur als Kontext fuer Folgefragen und Bezuege wie "wieder an",
+  "das gleiche" oder "hat das geklappt?". Diese Zeilen sind niemals ein
+  Ausgabeformat. Antworte weiterhin ausschliesslich im JSON-Pflichtformat.
 
   Stil fuer "reply":
   - Kurz, locker, alltagsdeutsch. 1 Satz, oft nur paar Worte.

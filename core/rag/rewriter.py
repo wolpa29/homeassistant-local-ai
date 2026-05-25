@@ -27,11 +27,10 @@ from core.config import (
     LLM_PREPROCESSOR_MODEL,
     LLM_PREPROCESSOR_TIMEOUT,
     LLM_PREPROCESSOR_TEMPERATURE,
-    HISTORY_INCLUDE_ASSISTANT,
     LMSTUDIO_NO_THINK,
     LANGUAGE,
 )
-from core.llm import get_history_snapshot, _load_memory
+from core.llm import get_history_snapshot, _load_memory, format_history_block_for_llm
 from core.strings import t
 
 logger = logging.getLogger(__name__)
@@ -65,33 +64,7 @@ def _build_history_block(chat_id: int) -> str:
     if not snapshot:
         return t("history_empty")
 
-    lines: list[str] = []
-    user_label = t("history_user_label")
-    assistant_label = t("history_assistant_label")
-    exec_marker = "\n" + t("exec_summary_marker")
-    for m in snapshot:
-        role = m.get("role", "")
-        content = m.get("content", "")
-        if role == "user":
-            lines.append(f"{user_label} {content}")
-        elif role == "assistant" and HISTORY_INCLUDE_ASSISTANT:
-            # Extract the human-readable reply from raw JSON if present
-            reply = ""
-            match = re.search(r"\{.*\}", content, re.DOTALL)
-            if match:
-                try:
-                    reply = json.loads(match.group()).get("reply", "").strip()
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-            # Fall back to raw content (e.g. clarification questions, smalltalk)
-            if not reply:
-                reply = content.strip()
-            # Strip execution summaries appended after the JSON
-            reply = reply.split(exec_marker)[0].strip()
-            if reply:
-                lines.append(f"{assistant_label} {reply}")
-
-    return "\n".join(lines) if lines else t("history_empty")
+    return format_history_block_for_llm(snapshot)
 
 
 def _headers() -> dict:

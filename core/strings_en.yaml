@@ -46,6 +46,11 @@ exec_summary_marker: "executed:"
 exec_status_ok: "[OK]"
 exec_status_error: "[ERROR]"
 exec_status_timeout: "[Timeout - possibly executed]"
+exec_context_prefix: "Execution context:"
+exec_context_success: "successful"
+exec_context_error: "failed"
+exec_context_timeout: "Timeout, execution unknown"
+exec_context_item: "{status} {action} on {entity_id}"
 
 # --- State humanisation (used in entity_list inside the LLM prompt) ---
 state_on: "on"
