@@ -141,7 +141,7 @@ The script (`voice_client.py`) listens for a wake word, records your command, se
 
 `install.sh` automates steps 1–8 below in a single run. It is safe to re-run on an existing installation — it will ask whether to keep or replace the existing `.env`.
 
-**From your PC** (inside the `hass-ai-gateway` project directory):
+**From your PC** (inside the `homeassistant-ai-gateway` project directory):
 
 ```bash
 PI_IP=<your-pi-ip>   # e.g. 192.168.1.50
@@ -215,7 +215,7 @@ sudo apt install -y python3-pip python3-venv portaudio19-dev
 
 ### 2. Copy Files to the Pi
 
-Run this from your PC inside the hass-ai-gateway project directory:
+Run this from your PC inside the homeassistant-ai-gateway project directory:
 
 ```bash
 PI_IP=<your-pi-ip>   # e.g. 192.168.1.50

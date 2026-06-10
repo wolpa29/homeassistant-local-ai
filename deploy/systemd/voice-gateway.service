@@ -6,9 +6,9 @@ Wants=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/hass-ai-gateway/services/voice_gateway
-ExecStart=/root/hass-ai-gateway/services/voice_gateway/voice_gateway_env/bin/python /root/hass-ai-gateway/services/voice_gateway/main.py
-Environment="PATH=/root/hass-ai-gateway/services/voice_gateway/voice_gateway_env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/root/homeassistant-ai-gateway/services/voice_gateway
+ExecStart=/root/homeassistant-ai-gateway/services/voice_gateway/voice_gateway_env/bin/python /root/homeassistant-ai-gateway/services/voice_gateway/main.py
+Environment="PATH=/root/homeassistant-ai-gateway/services/voice_gateway/voice_gateway_env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Restart=always
 RestartSec=10
 StandardOutput=journal

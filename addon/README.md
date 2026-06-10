@@ -1,4 +1,4 @@
-# Hass AI Gateway Add-on
+# Home Assistant AI Gateway Add-on
 
 Control your smart home with a **local LLM** — no cloud, no subscriptions. Connect LM Studio (or any OpenAI-compatible server) to Home Assistant and interact via Telegram, voice message, or microphone in any room.
 
@@ -30,8 +30,8 @@ The full stack (LM Studio + Whisper + TTS + embedding) runs on a single machine:
 
 ## Quick start
 
-1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste `https://github.com/wolpa29/hass-ai-gateway`.
-2. Install **Hass AI Gateway**.
+1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste `https://github.com/wolpa29/homeassistant-ai-gateway`.
+2. Install **Home Assistant AI Gateway**.
 3. Open **Configuration**, fill in at minimum:
    - `telegram` → `bot_token`, `chat_id`
    - `lmstudio` → `url`

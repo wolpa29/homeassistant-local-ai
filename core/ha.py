@@ -119,7 +119,7 @@ def get_state(entity_id: str) -> dict | None:
         return None
 
 
-def notify_persistent(title: str, message: str, notification_id: str = "hass_ai_gateway") -> None:
+def notify_persistent(title: str, message: str, notification_id: str = "homeassistant_ai_gateway") -> None:
     """Create or replace a HA persistent notification (bell icon in the UI)."""
     headers = {
         "Authorization": f"Bearer {HA_TOKEN}",

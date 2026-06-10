@@ -6,9 +6,9 @@ Wants=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/hass-ai-gateway/services/telegram_bot
-Environment="PATH=/root/hass-ai-gateway/services/telegram_bot/telegram_bot_env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/root/hass-ai-gateway/services/telegram_bot/telegram_bot_env/bin/python /root/hass-ai-gateway/services/telegram_bot/main.py
+WorkingDirectory=/root/homeassistant-ai-gateway/services/telegram_bot
+Environment="PATH=/root/homeassistant-ai-gateway/services/telegram_bot/telegram_bot_env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/root/homeassistant-ai-gateway/services/telegram_bot/telegram_bot_env/bin/python /root/homeassistant-ai-gateway/services/telegram_bot/main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

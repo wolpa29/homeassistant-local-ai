@@ -1,11 +1,11 @@
-name: Hass AI Gateway
+name: Home Assistant AI Gateway
 version: "1.3.7"
-slug: hass_ai_gateway
+slug: homeassistant_ai_gateway
 description: >-
   Control Home Assistant with a local LLM via voice, Telegram, and notifications.
   Three Python services in one container, each individually toggleable.
-url: https://github.com/wolpa29/hass-ai-gateway
-image: "ghcr.io/wolpa29/hass-ai-gateway/{arch}-addon-hass_ai_gateway"
+url: https://github.com/wolpa29/homeassistant-ai-gateway
+image: "ghcr.io/wolpa29/homeassistant-ai-gateway/{arch}-addon-homeassistant_ai_gateway"
 arch:
   - aarch64
   - amd64

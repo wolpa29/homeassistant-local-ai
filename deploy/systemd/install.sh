@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install script for the hass-ai-gateway systemd services.
+# Install script for the homeassistant-ai-gateway systemd services.
 #
 # For each service listed in SERVICES below it will:
 #   1. create a venv inside the service directory: <service>_env/

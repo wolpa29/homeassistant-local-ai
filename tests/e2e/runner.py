@@ -1,4 +1,4 @@
-"""End-to-end test runner for hass-ai-gateway.
+"""End-to-end test runner for homeassistant-ai-gateway.
 
 For each settings variant in matrix.yaml the runner:
   1. Builds an isolated .env (root .env + common_env + matrix env) and writes

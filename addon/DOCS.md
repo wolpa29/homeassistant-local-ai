@@ -1,4 +1,4 @@
-# Hass AI Gateway — Documentation
+# Home Assistant AI Gateway — Documentation
 
 The idea behind this add-on is to make your Home Assistant installation smart by connecting it to a **local LLM** — no cloud, no subscriptions. You run the language model yourself (e.g. via LM Studio) and this add-on acts as the bridge: it takes your requests, finds the right entities, lets the LLM decide what to do, and executes the actions in HA.
 
@@ -45,8 +45,8 @@ It installs all dependencies and sets up the client. Configure the gateway URL a
 
 ## Installation
 
-1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, add `https://github.com/wolpa29/hass-ai-gateway`.
-2. Install **Hass AI Gateway** and open the **Configuration** tab.
+1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, add `https://github.com/wolpa29/homeassistant-ai-gateway`.
+2. Install **Home Assistant AI Gateway** and open the **Configuration** tab.
 3. Fill in at minimum:
    - `telegram` → `bot_token` (from @BotFather), `chat_id` (your numeric Telegram user ID)
    - `lmstudio` → `url` (e.g. `http://192.168.1.10:1234`)
