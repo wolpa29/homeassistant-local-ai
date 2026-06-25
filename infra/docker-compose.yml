@@ -1,0 +1,46 @@
+# Combined infra stack: Whisper (speech-to-text) + TTS (text-to-speech).
+# Start both with one command:  bash infra/start.sh   (or: docker compose up -d)
+#
+# Ports (host):
+#   10300  Whisper STT  (OpenAI-compatible /v1/audio/transcriptions)
+#   10400  TTS          (POST /tts)
+#
+# The two services are independent, you can still run each on its own via
+# infra/faster_whisper/docker-compose.yml and infra/tts_server/docker-compose.yml.
+services:
+  faster-whisper:
+    image: fedirz/faster-whisper-server:latest-cuda
+    container_name: faster-whisper-server
+    environment:
+      - WHISPER__MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
+      - WHISPER__INFERENCE_DEVICE=cuda
+      - WHISPER__COMPUTE_TYPE=float16
+      - WHISPER__TTL=-1
+      - WHISPER__LANGUAGE=de
+      - WHISPER__USE_VAD=true
+    volumes:
+      - ./faster_whisper/model-cache:/root/.cache/huggingface
+    ports:
+      - "10300:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  tts:
+    build: ./tts_server
+    container_name: tts-server
+    environment:
+      - DEFAULT_VOICE=de_DE-thorsten-low
+      - MODELS_DIR=/models
+      - TTS_PORT=10400
+      - RESAMPLE_RATE=16000
+    volumes:
+      - ./tts_server/models:/models
+    ports:
+      - "10400:10400"
+    restart: unless-stopped

@@ -7,7 +7,7 @@ if ! bashio::config.true 'rag.enabled'; then
     exit 0
 fi
 
-source /usr/lib/homeassistant-ai-gateway/export-env.sh
+source /usr/lib/homeassistant-local-ai/export-env.sh
 
 bashio::log.info "[rag-build] RAG aktiv — starte automatischen Index-Rebuild ..."
 

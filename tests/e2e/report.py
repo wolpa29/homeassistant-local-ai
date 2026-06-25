@@ -16,7 +16,7 @@ _HTML_TPL = Template(r"""<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>homeassistant-ai-gateway E2E - $timestamp</title>
+<title>homeassistant-local-ai E2E - $timestamp</title>
 <style>
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0f172a; color: #e5e7eb; }
   header { padding: 18px 24px; background: #1e293b; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 10; }
@@ -61,7 +61,7 @@ _HTML_TPL = Template(r"""<!doctype html>
 </head>
 <body>
 <header>
-  <h1>homeassistant-ai-gateway - End-to-End-Report</h1>
+  <h1>homeassistant-local-ai - End-to-End-Report</h1>
   <div class="meta">$timestamp - $count cases - $runs runs</div>
   <div class="summary">
     <span class="pill pass">$pass_count passed</span>

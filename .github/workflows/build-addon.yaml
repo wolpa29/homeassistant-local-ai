@@ -59,7 +59,7 @@ jobs:
           VERSION=$(grep '^version:' addon/config.yaml | sed 's/version: *"\(.*\)"/\1/')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${REPO_OWNER}/homeassistant-ai-gateway/${{ matrix.arch }}-addon-homeassistant_ai_gateway" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPO_OWNER}/homeassistant-local-ai/${{ matrix.arch }}-addon-homeassistant_local_ai" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6

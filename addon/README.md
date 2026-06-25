@@ -30,7 +30,7 @@ The full stack (LM Studio + Whisper + TTS + embedding) runs on a single machine:
 
 ## Quick start
 
-1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste `https://github.com/wolpa29/homeassistant-ai-gateway`.
+1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste `https://github.com/wolpa29/homeassistant-local-ai`.
 2. Install **Home Assistant AI Gateway**.
 3. Open **Configuration**, fill in at minimum:
    - `telegram` → `bot_token`, `chat_id`

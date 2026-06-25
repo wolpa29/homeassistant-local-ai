@@ -23,7 +23,7 @@ Telegram button/menu actions bypass the brain entirely: they call Home Assistant
 ## 1. Folder layout
 
 ```
-homeassistant-ai-gateway/
+homeassistant-local-ai/
 ├── core/                              <- framework-agnostic command logic
 │   ├── processor.py                   -- single source of truth (transcript -> actions)
 │   ├── config.py                      -- .env loader + all settings
@@ -478,7 +478,7 @@ Renderers:
 
 ### HA Supervisor add-on (recommended)
 
-Add the repo URL to the HA Add-on Store, install **Home Assistant AI Gateway**, fill in options, hit Start. Config is injected via `addon/rootfs/usr/lib/homeassistant-ai-gateway/export-env.sh` — no `.env` needed inside the container.
+Add the repo URL to the HA Add-on Store, install **Home Assistant AI Gateway**, fill in options, hit Start. Config is injected via `addon/rootfs/usr/lib/homeassistant-local-ai/export-env.sh` — no `.env` needed inside the container.
 
 ### Bare-metal / systemd
 
@@ -486,7 +486,7 @@ Add the repo URL to the HA Add-on Store, install **Home Assistant AI Gateway**, 
 sudo deploy/systemd/install.sh
 ```
 
-Creates a venv per service under `services/<svc>/<svc>_env/`, copies `.service` units to `/etc/systemd/system/`, and enables them. Assumes the repo lives at `/root/homeassistant-ai-gateway/`. Requires a `.env` file in the repo root (see `.env.example`).
+Creates a venv per service under `services/<svc>/<svc>_env/`, copies `.service` units to `/etc/systemd/system/`, and enables them. Assumes the repo lives at `/root/homeassistant-local-ai/`. Requires a `.env` file in the repo root (see `.env.example`).
 
 ### Manual (development)
 

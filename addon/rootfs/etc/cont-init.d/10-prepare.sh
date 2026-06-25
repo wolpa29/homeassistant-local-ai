@@ -4,7 +4,7 @@ set -e
 
 mkdir -p /data/voice /data/rag
 
-bashio::log.info "homeassistant-ai-gateway: data dir ready (/data/voice, /data/rag)"
+bashio::log.info "homeassistant-local-ai: data dir ready (/data/voice, /data/rag)"
 
 # User-editable config files in /config (= /addon_configs/<slug>/ on the host,
 # visible via Samba and the official "File editor" addon).
@@ -24,7 +24,7 @@ if [ ! -f /config/menus.yaml ]; then
     bashio::log.info "seeded /config/menus.yaml from defaults"
 fi
 
-bashio::log.info "homeassistant-ai-gateway: user config ready at /addon_configs/<slug>/"
+bashio::log.info "homeassistant-local-ai: user config ready at /addon_configs/<slug>/"
 
 # Hard-fail when an enabled service is missing required config. The HA UI
 # cannot enforce conditional "required" fields, so we validate here. The user
@@ -68,4 +68,4 @@ if [ "${ERRORS}" -gt 0 ]; then
     bashio::exit.nok "Fix ${ERRORS} configuration error(s) in the Configuration tab and restart the add-on."
 fi
 
-bashio::log.info "homeassistant-ai-gateway: cont-init complete"
+bashio::log.info "homeassistant-local-ai: cont-init complete"

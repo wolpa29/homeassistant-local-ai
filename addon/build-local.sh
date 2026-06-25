@@ -31,7 +31,7 @@ find "$BUILD_DIR" -type d \( -name __pycache__ -o -name '*_env' \) -prune -exec 
 find "$BUILD_DIR" -type f -name '.env*' ! -name '*.example' -delete
 
 BASE="ghcr.io/home-assistant/${ARCH}-base-python:3.12-alpine3.19"
-IMG="local/homeassistant-ai-gateway-${ARCH}:dev"
+IMG="local/homeassistant-local-ai-${ARCH}:dev"
 
 echo "[build-local] docker build  arch=${ARCH}  base=${BASE}  tag=${IMG}"
 docker build \

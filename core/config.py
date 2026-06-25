@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load .env robustly regardless of the current working directory.
 # Priority:
 #   1. DOTENV_PATH env var (explicit override)
-#   2. <repo>/.env  (canonical location — shared by all services)
+#   2. <repo>/.env  (canonical location, shared by all services)
 #   3. <repo>/services/telegram_bot/.env  (legacy fallback)
 #   4. Whatever load_dotenv() finds walking up from CWD (last resort)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -29,19 +29,16 @@ LANGUAGE = os.getenv("LANGUAGE", "de").lower()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MY_CHAT_ID = int(os.getenv("MY_CHAT_ID", "0"))
 
-# Shared secret sent as X-Api-Key by clients (RPi voice client, notify_gateway → tts).
+# Shared secret sent as X-Api-Key by clients (RPi voice client, notify_gateway to tts).
 # Empty = no auth (LAN-only deployments).
 GATEWAY_API_KEY = os.getenv("GATEWAY_API_KEY", "")
 
 HA_URL = os.getenv("HA_URL")
 HA_TOKEN = os.getenv("HA_TOKEN")
 
-CHECK_INTERVAL_SECONDS = int(os.getenv("CHECK_INTERVAL_SECONDS", "300"))
-BATTERY_THRESHOLD = float(os.getenv("BATTERY_THRESHOLD", "80"))
-
 # External TTS server (tts_server service).
 # When set, the voice gateway calls this to synthesize replies and returns WAV
-# directly to the Pi instead of JSON — no TTS processing on the Pi needed.
+# directly to the Pi instead of JSON, no TTS processing on the Pi needed.
 # Leave empty to keep returning JSON (Pi does TTS locally).
 TTS_EXTERNAL_URL = os.getenv("TTS_EXTERNAL_URL", "")
 TTS_EXTERNAL_VOICE = os.getenv("TTS_EXTERNAL_VOICE", "de_DE-thorsten-low")
@@ -92,7 +89,7 @@ else:
 LLM_HISTORY_SIZE = int(os.getenv("LLM_HISTORY_SIZE", "0"))
 MAX_ACTIONS_PER_COMMAND = int(os.getenv("MAX_ACTIONS_PER_COMMAND", "0"))
 
-# RAG mode — replaces the entities.yaml -> LLM step when enabled.
+# RAG mode, replaces the entities.yaml -> LLM step when enabled.
 # Set RAG_ENABLED=false to keep the legacy behaviour completely unchanged.
 RAG_ENABLED = os.getenv("RAG_ENABLED", "false").lower() == "true"
 _RAG_DB_DEFAULT = str(_PROJECT_ROOT / "data" / "rag" / "entities.sqlite")
@@ -109,7 +106,7 @@ RAG_KEYWORD_BOOST = float(os.getenv("RAG_KEYWORD_BOOST", "0.3"))
 # zu RAG_TOP_K - das jeweils strengere Limit greift. Default 0.0 = aus.
 RAG_DISTANCE_THRESHOLD = float(os.getenv("RAG_DISTANCE_THRESHOLD", "0.0"))
 
-# Embedding model host — separate from chat LM Studio so you can use a different
+# Embedding model host, separate from chat LM Studio so you can use a different
 # server for embeddings if you want. Defaults fall back to the chat LM Studio.
 RAG_EMBED_URL = os.getenv("RAG_EMBED_URL", "") or LMSTUDIO_URL
 RAG_EMBED_API_KEY = os.getenv("RAG_EMBED_API_KEY", "") or LMSTUDIO_API_KEY
@@ -117,7 +114,7 @@ RAG_EMBED_TIMEOUT = int(os.getenv("RAG_EMBED_TIMEOUT", "") or str(LMSTUDIO_TIMEO
 RAG_EMBED_MODEL = os.getenv("RAG_EMBED_MODEL", "text-embedding-nomic-embed-text-v2-moe")
 RAG_EMBED_DIM = int(os.getenv("RAG_EMBED_DIM", "768"))
 
-# LLM Preprocessor — runs a small LLM call before the main pipeline to classify
+# LLM Preprocessor, runs a small LLM call before the main pipeline to classify
 # intent (command | smalltalk), fix typos / STT errors, and resolve pronouns from
 # history. Independent of RAG_ENABLED. Each setting falls back to the main
 # LMSTUDIO_* equivalent if empty.
@@ -131,12 +128,12 @@ LLM_PREPROCESSOR_TEMPERATURE = float(os.getenv("LLM_PREPROCESSOR_TEMPERATURE", "
 # UNIVERSAL (both RAG modes): if true, assistant turns are stored in history so
 # the LLM sees its own prior replies on the next turn. In RAG mode those replies
 # are additionally used to enrich the embed query for short follow-ups. If false,
-# only user turns are stored — the LLM has no memory of what it previously said.
+# only user turns are stored, the LLM has no memory of what it previously said.
 HISTORY_INCLUDE_ASSISTANT = os.getenv("HISTORY_INCLUDE_ASSISTANT", "true").lower() == "true"
 
 # UNIVERSAL (both RAG modes): if true, the execution summary
 # ("ausgefuehrt: turn_on -> light.kueche_decke, ...") is appended to the stored
-# assistant turn. Requires HISTORY_INCLUDE_ASSISTANT=true — otherwise there is
+# assistant turn. Requires HISTORY_INCLUDE_ASSISTANT=true, otherwise there is
 # no assistant turn to append to.
 HISTORY_APPEND_EXECUTIONS = os.getenv("HISTORY_APPEND_EXECUTIONS", "false").lower() == "true"
 
