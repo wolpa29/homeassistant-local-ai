@@ -1,4 +1,4 @@
-# Home Assistant AI Gateway, Documentation
+# Home Assistant Local AI, Documentation
 
 The idea behind this add-on is to make your Home Assistant installation smart by connecting it to a **local LLM**, no cloud, no subscriptions. You run the language model yourself (e.g. via LM Studio) and this add-on acts as the bridge: it takes your requests, finds the right entities, lets the LLM decide what to do, and executes the actions in HA.
 
@@ -49,7 +49,7 @@ It installs all dependencies and sets up the client. Configure the gateway URL a
 ## Quick start (5 fields)
 
 1. **Settings, Add-ons, Add-on Store, three-dot menu, Repositories**, add `https://github.com/wolpa29/homeassistant-local-ai`.
-2. Install **Home Assistant AI Gateway** and open the **Configuration** tab.
+2. Install **Home Assistant Local AI** and open the **Configuration** tab.
 3. Fill in these five fields, everything else has working defaults you can leave alone:
 
    | Field | Example | Notes |

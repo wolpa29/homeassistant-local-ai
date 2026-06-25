@@ -78,6 +78,6 @@ jobs:
             io.hass.version=${{ steps.meta.outputs.version }}
             io.hass.arch=${{ matrix.arch }}
             io.hass.type=addon
-            io.hass.name=Home Assistant AI Gateway
+            io.hass.name=Home Assistant Local AI
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}

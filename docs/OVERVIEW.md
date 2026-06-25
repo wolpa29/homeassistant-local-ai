@@ -478,7 +478,7 @@ Renderers:
 
 ### HA Supervisor add-on (recommended)
 
-Add the repo URL to the HA Add-on Store, install **Home Assistant AI Gateway**, fill in options, hit Start. Config is injected via `addon/rootfs/usr/lib/homeassistant-local-ai/export-env.sh` — no `.env` needed inside the container.
+Add the repo URL to the HA Add-on Store, install **Home Assistant Local AI**, fill in options, hit Start. Config is injected via `addon/rootfs/usr/lib/homeassistant-local-ai/export-env.sh` — no `.env` needed inside the container.
 
 ### Bare-metal / systemd
 

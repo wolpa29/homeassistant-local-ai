@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="addon/logo.png" alt="Home Assistant AI Gateway" width="200"/>
+  <img src="addon/logo.png" alt="Home Assistant Local AI" width="200"/>
 </p>
 
-<h1 align="center">Home Assistant AI Gateway</h1>
+<h1 align="center">Home Assistant Local AI</h1>
 
 <p align="center">
   Control your smart home with a <b>local LLM</b>, by text, voice message, or a
@@ -46,7 +46,7 @@ Install [LM Studio](https://lmstudio.ai), load a **chat model** and an **embeddi
 
 ### Step 3: Install the add-on
 
-Click **[Add to my Home Assistant](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fwolpa29%2Fhomeassistant-local-ai)** (or go to **Settings, Add-ons, Add-on Store, three-dot menu, Repositories** and add this repo's URL), then install **Home Assistant AI Gateway** (ports 8765 + 8766).
+Click **[Add to my Home Assistant](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fwolpa29%2Fhomeassistant-local-ai)** (or go to **Settings, Add-ons, Add-on Store, three-dot menu, Repositories** and add this repo's URL), then install **Home Assistant Local AI** (ports 8765 + 8766).
 
 ### Step 4: Fill in 5 fields and start
 
