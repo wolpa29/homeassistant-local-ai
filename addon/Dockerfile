@@ -44,6 +44,6 @@ RUN chmod +x \
         /etc/services.d/voice-gateway/run \
         /etc/services.d/notify-gateway/run \
         /etc/services.d/telegram-bot/run \
-        /usr/lib/homeassistant-ai-gateway/export-env.sh
+        /usr/lib/homeassistant-local-ai/export-env.sh
 
 # /init from the HA base image starts s6-overlay; do not override.
