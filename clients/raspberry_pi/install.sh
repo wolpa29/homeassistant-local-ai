@@ -328,15 +328,10 @@ EOF
 info "Reloading systemd daemon…"
 sudo systemctl daemon-reload
 
-info "Enabling service to start on boot…"
-sudo systemctl enable "$SERVICE_NAME"
-
-info "Starting (or restarting) service…"
-if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
-    sudo systemctl restart "$SERVICE_NAME"
-else
-    sudo systemctl start "$SERVICE_NAME"
-fi
+# ---------------------------------------------------------------------------
+section "10 — Start service"
+# ---------------------------------------------------------------------------
+bash "$INSTALL_DIR/start.sh"
 
 # ---------------------------------------------------------------------------
 section "Done"
