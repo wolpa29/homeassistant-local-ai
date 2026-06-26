@@ -94,6 +94,33 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 CURRENT_USER="$(whoami)"
 GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/clients/raspberry_pi"
 
+# All client files this script expects to exist locally.
+CLIENT_FILES=(voice_client.py mic_level.py requirements.txt start.sh stop.sh level.sh)
+
+download_file() {
+    info "Downloading ${1}..."
+    # Download to a temp file and rename into place. The rename is atomic and the
+    # running shell keeps its old inode open, so this can safely overwrite even
+    # start.sh itself while it is executing.
+    local tmp; tmp="$(mktemp)"
+    if wget -q -O "$tmp" "${GITHUB_RAW}/${1}"; then
+        mv "$tmp" "$INSTALL_DIR/${1}"
+        [[ "${1}" == *.sh ]] && chmod +x "$INSTALL_DIR/${1}"
+    else
+        rm -f "$tmp"
+        warn "Failed to download ${1}"
+        return 1
+    fi
+}
+
+# Subcommand:  bash start.sh update  -> re-download all client files (latest).
+if [[ "${1:-}" == "update" ]]; then
+    echo -e "${CYAN}Updating client files${NC}"
+    for f in "${CLIENT_FILES[@]}"; do download_file "$f"; done
+    info "Done. Restart the service: sudo systemctl restart ${SERVICE_NAME}"
+    exit 0
+fi
+
 # Subcommand:  bash start.sh measure  -> only run the live mic-level meter, using
 # the microphone from an existing .env. Lets you re-tune VAD_SILENCE_THRESHOLD
 # anytime without redoing the whole setup.
@@ -186,36 +213,30 @@ if [[ ! -f "$INSTALL_DIR/.configured" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3 - Download client files (only on first run)
+# 3 - Download / update client files (every run)
 # ---------------------------------------------------------------------------
-if [[ ! -f "$INSTALL_DIR/voice_client.py" ]]; then
-    section "3 - Download client files"
-    mkdir -p "$INSTALL_DIR/models"
-
-    download_file() {
-        info "Downloading ${1}..."
-        wget -q -O "$INSTALL_DIR/${1}" "${GITHUB_RAW}/${1}"
-    }
-
-    download_file "voice_client.py"
-    download_file "mic_level.py"
-    download_file "requirements.txt"
-    download_file "start.sh"
-    download_file "stop.sh"
-    download_file "level.sh"
-    chmod +x "$INSTALL_DIR/start.sh" "$INSTALL_DIR/stop.sh" "$INSTALL_DIR/level.sh"
-fi
+# Always pull the latest files so re-running the same one-liner also updates an
+# existing install. Safe to overwrite start.sh while running (see download_file).
+section "3 - Download / update client files"
+mkdir -p "$INSTALL_DIR/models"
+for f in "${CLIENT_FILES[@]}"; do download_file "$f"; done
 
 # ---------------------------------------------------------------------------
-# 4 - Python venv + dependencies (only on first run)
+# 4 - Python venv + dependencies
 # ---------------------------------------------------------------------------
-if [[ ! -d "$INSTALL_DIR/venv" ]]; then
-    section "4 - Python virtual environment"
-    python3 -m venv "$INSTALL_DIR/venv"
+REQ_HASH_FILE="$INSTALL_DIR/.requirements.md5"
+install_deps() {
     info "Installing openwakeword..."
     "$INSTALL_DIR/venv/bin/pip" install --quiet openwakeword --no-deps
     info "Installing remaining requirements..."
     "$INSTALL_DIR/venv/bin/pip" install --quiet -r "$INSTALL_DIR/requirements.txt"
+    md5sum "$INSTALL_DIR/requirements.txt" > "$REQ_HASH_FILE"
+}
+
+if [[ ! -d "$INSTALL_DIR/venv" ]]; then
+    section "4 - Python virtual environment"
+    python3 -m venv "$INSTALL_DIR/venv"
+    install_deps
 
     section "5 - Download openwakeword models"
     "$INSTALL_DIR/venv/bin/python3" -c "
@@ -223,6 +244,10 @@ from openwakeword.utils import download_models
 download_models()
 print('openwakeword models downloaded.')
 "
+elif ! md5sum -c "$REQ_HASH_FILE" &>/dev/null; then
+    # venv exists but requirements.txt changed (or hash missing) - refresh deps.
+    section "4 - Updating Python dependencies"
+    install_deps
 fi
 
 # ---------------------------------------------------------------------------
@@ -460,4 +485,5 @@ echo "  Stop      : bash ${INSTALL_DIR}/stop.sh"
 echo "  Config    : nano ${INSTALL_DIR}/.env  then: bash ${INSTALL_DIR}/start.sh"
 echo "  Mic level : bash ${INSTALL_DIR}/level.sh            (watch the live level)"
 echo "  Set thresh: bash ${INSTALL_DIR}/start.sh measure    (pick VAD threshold)"
+echo "  Update    : re-run the same one-liner (updates all files automatically)"
 echo
