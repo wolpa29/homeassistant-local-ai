@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1 - 2026-06-26
+
+- Fix: renamed internal lib directory and service run scripts to match new repo name (homeassistant-local-ai), fixing startup crash on fresh installs.
+
 ## 1.4.0 - 2026-06-26
 
 - Onboarding simplified: the README is now a linear, numbered setup guide (each step says what it does and which port it uses), with an "Add to my Home Assistant" button.
