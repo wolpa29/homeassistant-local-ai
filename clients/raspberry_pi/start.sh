@@ -26,6 +26,59 @@ section() { echo -e "\n${CYAN}=== $* ===${NC}"; }
 # Dimmed one-line explanation printed above a prompt so the user knows what it does.
 hint()    { echo -e "    ${DIM}$*${NC}"; }
 
+# Live mic-level meter — helps pick VAD_SILENCE_THRESHOLD without guessing.
+# Records the room's noise floor (quiet) and a speech peak in the SAME int16 RMS
+# unit the client uses, then recommends a value between the two. Sets the global
+# VAD_MEASURED to the recommendation, or leaves it empty if measuring failed.
+measure_mic_level() {
+    VAD_MEASURED=""
+    local py="$INSTALL_DIR/venv/bin/python3"
+    if [[ ! -x "$py" ]]; then
+        warn "venv-Python nicht gefunden — überspringe Messung."
+        return 0
+    fi
+    local recfile; recfile="$(mktemp)"
+    # arecord dies with SIGPIPE when the meter exits; '|| true' keeps pipefail happy.
+    RECFILE="$recfile" arecord -D "$ALSA_INPUT_DEVICE" -f S16_LE -c 1 -r 16000 -t raw 2>/dev/null \
+      | RECFILE="$recfile" "$py" - <<'PY' || true
+import os, sys, time
+import numpy as np
+
+CHUNK = 1280  # 80 ms @ 16 kHz — same chunk size as VAD_SILENCE_THRESHOLD uses
+
+def meter(seconds, label):
+    end = time.time() + seconds
+    vals = []
+    while time.time() < end:
+        raw = sys.stdin.buffer.read(CHUNK * 2)
+        if len(raw) < 2:
+            break
+        x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+        rms = int((x ** 2).mean() ** 0.5) if x.size else 0
+        vals.append(rms)
+        bar = "#" * min(40, rms // 50)
+        print(f"\r    {label}: RMS {rms:5d}  |{bar:<40}|", end="", flush=True)
+    print()
+    return vals
+
+print("    Bitte 3 Sekunden STILL sein …")
+quiet = meter(3, "Ruhe  ")
+print("    Jetzt 3 Sekunden NORMAL sprechen …")
+loud = meter(3, "Sprache")
+
+if quiet and loud:
+    floor = int(np.percentile(quiet, 90))   # noise floor (loud end of "quiet")
+    speech = int(np.percentile(loud, 75))   # typical speech level
+    # Sit comfortably above the noise floor but well below speech.
+    rec = int(min(max(floor * 3, 300), max(int(speech * 0.4), 350)))
+    print(f"\n    Ruhepegel ~{floor}   Sprache ~{speech}   →  Empfehlung: {rec}")
+    with open(os.environ["RECFILE"], "w") as f:
+        f.write(str(rec))
+PY
+    [[ -s "$recfile" ]] && VAD_MEASURED="$(cat "$recfile")"
+    rm -f "$recfile"
+}
+
 ask() {
     local var=$1 prompt=$2 default=${3:-}
     local display_default=""
@@ -53,6 +106,22 @@ SERVICE_NAME="voice-client"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 CURRENT_USER="$(whoami)"
 GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/clients/raspberry_pi"
+
+# Subcommand:  bash start.sh measure  → only run the live mic-level meter, using
+# the microphone from an existing .env. Lets you re-tune VAD_SILENCE_THRESHOLD
+# anytime without redoing the whole setup.
+if [[ "${1:-}" == "measure" ]]; then
+    if [[ -f "$INSTALL_DIR/.env" ]]; then
+        ALSA_INPUT_DEVICE="$(grep -E '^ALSA_INPUT_DEVICE=' "$INSTALL_DIR/.env" | cut -d= -f2-)"
+    fi
+    ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-plughw:1,0}"
+    echo -e "${CYAN}Mikrofon-Pegelmesser${NC} (Gerät: ${ALSA_INPUT_DEVICE})"
+    measure_mic_level
+    echo
+    info "Setze VAD_SILENCE_THRESHOLD in ${INSTALL_DIR}/.env auf den empfohlenen Wert,"
+    info "dann: sudo systemctl restart ${SERVICE_NAME}"
+    exit 0
+fi
 
 echo
 echo -e "${CYAN}Raspberry Pi Voice Client${NC}"
@@ -220,7 +289,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo
     hint "Ab welcher Lautstärke (RMS) Ton als Sprache zählt. In lauten Räumen erhöhen,"
     hint "damit Hintergrundgeräusche die Aufnahme nicht endlos offen halten."
-    ask VAD_SILENCE_THRESHOLD "VAD silence threshold (int16 RMS, raise in noisy rooms)" "500"
+    VAD_DEFAULT="500"
+    if confirm "Mikrofonpegel jetzt live messen, um einen guten Wert zu finden?"; then
+        measure_mic_level
+        [[ -n "${VAD_MEASURED:-}" ]] && VAD_DEFAULT="$VAD_MEASURED"
+    fi
+    ask VAD_SILENCE_THRESHOLD "VAD silence threshold (int16 RMS, raise in noisy rooms)" "$VAD_DEFAULT"
     echo
     hint "Wie lange Stille (Sekunden) das Ende deines Satzes markiert."
     ask VAD_SILENCE_DURATION  "VAD silence duration (seconds)"                           "1.0"
