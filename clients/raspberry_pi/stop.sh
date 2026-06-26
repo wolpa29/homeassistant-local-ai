@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Stop the voice-client systemd service.
-# To bring it back up: bash start.sh
+# Stop the voice-client service and disable autostart on reboot.
+# To start again: bash start.sh
 set -euo pipefail
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 SERVICE_NAME="voice-client"
 
 if ! systemctl list-unit-files "${SERVICE_NAME}.service" &>/dev/null; then
-    echo -e "${YELLOW}[WARN]${NC}  Service '${SERVICE_NAME}' is not installed."
+    echo "Service '${SERVICE_NAME}' is not installed. Run start.sh first."
     exit 0
 fi
 
 echo "[voice-client] Stopping ${SERVICE_NAME}…"
 sudo systemctl stop "$SERVICE_NAME"
 
-echo "[voice-client] Disabling autostart…"
+echo "[voice-client] Disabling autostart on reboot…"
 sudo systemctl disable "$SERVICE_NAME"
 
 STATUS=$(sudo systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo "inactive")
@@ -26,4 +26,4 @@ else
 fi
 
 echo
-echo "  To start again:  bash start.sh"
+echo "  To start again: bash start.sh"

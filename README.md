@@ -36,7 +36,7 @@ Text only? You can skip Whisper and TTS and just type to the bot.
 
 ```bash
 mkdir ai-infra && cd ai-infra
-curl -sSL https://raw.githubusercontent.com/wolpay29/hass-ai-gateway/main/infra/setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/infra/setup.sh | bash
 ```
 
 Downloads everything, starts Whisper (port 10300) and TTS (port 10400), waits until both are healthy, and prints the exact URLs for Step 4. No repo clone needed. Skip this step for text-only. Needs Docker and an NVIDIA GPU, see [`infra/README.md`](infra/README.md).
@@ -79,7 +79,7 @@ Install the wake-word client on a Raspberry Pi:
 
 ```bash
 mkdir voice-client && cd voice-client
-curl -sSL https://raw.githubusercontent.com/wolpay29/hass-ai-gateway/main/clients/raspberry_pi/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/clients/raspberry_pi/start.sh | bash
 ```
 
 Downloads everything, walks you through configuration, and starts the service. No repo clone needed. Wake word triggers recording, the gateway (port 8765) handles transcription and the LLM pipeline, TTS plays the reply.
