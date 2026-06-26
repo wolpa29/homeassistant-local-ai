@@ -24,21 +24,21 @@ ask() {
     local var=$1 prompt=$2 default=${3:-}
     local display_default=""
     [[ -n $default ]] && display_default=" [${default}]"
-    read -rp "  ${prompt}${display_default}: " value
+    read -rp "  ${prompt}${display_default}: " value </dev/tty
     [[ -z $value ]] && value="$default"
     printf -v "$var" '%s' "$value"
 }
 
 ask_secret() {
     local var=$1 prompt=$2
-    read -rsp "  ${prompt}: " value
+    read -rsp "  ${prompt}: " value </dev/tty
     echo
     printf -v "$var" '%s' "$value"
 }
 
 confirm() {
     local answer
-    read -rp "  $* [y/N]: " answer
+    read -rp "  $* [y/N]: " answer </dev/tty
     [[ ${answer,,} == "y" || ${answer,,} == "yes" ]]
 }
 
@@ -154,7 +154,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "    [4] hey_rhasspy"
     echo "    [5] custom  (.onnx model file)"
     echo
-    read -rp "  Choose [1-5]: " ww_choice
+    read -rp "  Choose [1-5]: " ww_choice </dev/tty
     case "${ww_choice:-1}" in
         2) WAKE_WORD="alexa" ;;
         3) WAKE_WORD="hey_mycroft" ;;
@@ -164,7 +164,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
             echo -e "  ${CYAN}Place your .onnx model file in:${NC}"
             echo "    ${INSTALL_DIR}/models/"
             echo
-            read -rp "  Press Enter when the file is there…"
+            read -rp "  Press Enter when the file is there…" </dev/tty
             echo
             echo "  Files found in ${INSTALL_DIR}/models/:"
             ls "$INSTALL_DIR/models/"*.onnx 2>/dev/null | xargs -I{} basename {} || echo "    (none)"

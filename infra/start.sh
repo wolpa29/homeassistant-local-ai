@@ -29,7 +29,7 @@ if ! docker info >/dev/null 2>&1; then
     echo "  This is a one-time setup so Docker works without sudo."
     echo
     echo "  Fix automatically and continue? (runs: sudo usermod -aG docker ${USER})"
-    read -rp "  [y/N]: " fix_choice
+    read -rp "  [y/N]: " fix_choice </dev/tty
     if [[ "${fix_choice,,}" != "y" && "${fix_choice,,}" != "yes" ]]; then
         echo
         echo "  To fix manually:"
