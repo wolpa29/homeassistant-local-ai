@@ -24,9 +24,14 @@ GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/mai
 # Docker Compose detection
 # ---------------------------------------------------------------------------
 if ! docker info >/dev/null 2>&1; then
-    echo "ERROR: Cannot connect to Docker. Fix with:" >&2
-    echo "  sudo usermod -aG docker \$USER && newgrp docker" >&2
-    exit 1
+    echo "[infra] Docker not accessible — adding $USER to docker group…"
+    sudo usermod -aG docker "$USER"
+    echo "[infra] Done. Run this to activate without logout:"
+    echo
+    echo "    newgrp docker"
+    echo "    bash start.sh"
+    echo
+    exit 0
 fi
 
 if docker compose version >/dev/null 2>&1; then
