@@ -18,11 +18,13 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; DIM='\033[2m'; NC='\033[0m'
 info()    { echo -e "${GREEN}[INFO]${NC}  $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 section() { echo -e "\n${CYAN}=== $* ===${NC}"; }
+# Dimmed one-line explanation printed above a prompt so the user knows what it does.
+hint()    { echo -e "    ${DIM}$*${NC}"; }
 
 ask() {
     local var=$1 prompt=$2 default=${3:-}
@@ -147,11 +149,18 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "  Answer each question. Press Enter to accept the default."
     echo
 
+    hint "Adresse des Home-Assistant-Add-ons (Voice Gateway, Port 8765)."
+    hint "Format: http://<IP-von-Home-Assistant>:8765"
     ask GATEWAY_URL    "Voice Gateway URL"              "http://10.1.10.78:8765"
+    echo
+    hint "Nur nötig, wenn du im Add-on einen API-Key gesetzt hast — sonst leer lassen."
     ask_secret GATEWAY_API_KEY "Gateway API key (leave empty if none)"
+    echo
+    hint "Name dieses Geräts in den Logs und am Gateway, z. B. rpi-kueche."
     ask DEVICE_ID      "Device ID (e.g. rpi-wohnzimmer)" "rpi-wohnzimmer"
 
     echo
+    hint "Das Weckwort, auf das der Pi lauscht, bevor er aufnimmt."
     echo "  Wake word options:"
     echo "    [1] hey_jarvis (default)"
     echo "    [2] alexa"
@@ -184,6 +193,9 @@ if [[ ! -f "$ENV_FILE" ]]; then
     esac
     info "Wake word set to: ${WAKE_WORD}"
 
+    echo
+    hint "Empfindlichkeit des Weckworts (0=alles, 1=streng)."
+    hint "Höher = weniger Fehlauslösungen, aber Weckwort muss klarer gesprochen werden."
     ask WAKE_THRESHOLD "Wake threshold (0.0–1.0)" "0.5"
 
     echo
@@ -194,21 +206,47 @@ if [[ ! -f "$ENV_FILE" ]]; then
     aplay -l 2>/dev/null | grep "^card" || echo "  (none found)"
     echo
 
+    hint "Mikrofon. Aus 'arecord -l' oben ablesen: card 1 → plughw:1,0."
     ask ALSA_INPUT_DEVICE  "ALSA input device (mic)"      "plughw:1,0"
+    echo
+    hint "Lautsprecher. ReSpeaker-HAT = plughw:1,0, Pi-Klinkenbuchse = plughw:0,0."
     ask ALSA_OUTPUT_DEVICE "ALSA output device (speaker)" "plughw:1,0"
+    echo
+    hint "Wiedergabe-Lautstärke, z. B. 90% oder 100%."
     ask SPEAKER_VOLUME     "Speaker volume"                "100%"
 
     echo
+    info "VAD = automatische Spracherkennung: entscheidet, wann du fertig geredet hast."
+    echo
+    hint "Ab welcher Lautstärke (RMS) Ton als Sprache zählt. In lauten Räumen erhöhen,"
+    hint "damit Hintergrundgeräusche die Aufnahme nicht endlos offen halten."
     ask VAD_SILENCE_THRESHOLD "VAD silence threshold (int16 RMS, raise in noisy rooms)" "500"
+    echo
+    hint "Wie lange Stille (Sekunden) das Ende deines Satzes markiert."
     ask VAD_SILENCE_DURATION  "VAD silence duration (seconds)"                           "1.0"
+    echo
+    hint "Maximale Aufnahmelänge (Sekunden) — danach wird auf jeden Fall gesendet."
     ask VAD_MAX_DURATION      "Max recording duration (seconds)"                         "10.0"
+    echo
+    hint "Wie lange (Sekunden) nach dem Weckwort auf Sprachbeginn gewartet wird."
     ask VAD_INITIAL_TIMEOUT   "Seconds to wait for speech after wake word"               "5.0"
 
     echo
-    info "Follow-up mode: after the reply the Pi listens again without the wake word."
+    info "Follow-up-Modus: nach der Antwort lauscht der Pi nochmal OHNE Weckwort,"
+    info "damit du gleich nachfragen kannst."
+    echo
+    hint "Follow-up an/aus. Bei Echo-Problemen (Endlosschleife) auf false setzen."
     ask FOLLOWUP_ENABLED         "Enable follow-up mode (true/false)"               "true"
+    echo
+    hint "Wie lange (Sekunden) nach der Antwort auf eine Anschlussfrage gewartet wird."
     ask FOLLOWUP_INITIAL_TIMEOUT "Follow-up silence timeout (seconds)"              "1.5"
+    echo
+    hint "Wie viele laute 80-ms-Blöcke als echter Sprachbeginn zählen."
+    hint "Höher = Echo/TTS-Reste werden besser herausgefiltert."
     ask FOLLOWUP_ONSET_CHUNKS    "Follow-up onset chunks (raise to filter TTS echo)" "3"
+    echo
+    hint "Sekunden Mikrofon-Audio, die nach der Sprachausgabe verworfen werden"
+    hint "(gegen das Echo der eigenen Stimme)."
     ask FOLLOWUP_DRAIN_SECONDS   "Drain seconds after playback (absorbs TTS echo)"   "0.5"
 
     echo

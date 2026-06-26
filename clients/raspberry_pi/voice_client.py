@@ -392,11 +392,15 @@ def _pcm_to_wav(pcm: bytes) -> bytes:
 # Gateway call
 # ---------------------------------------------------------------------------
 
-def _send_audio(wav_bytes: bytes) -> tuple[bytes | None, str]:
+def _send_audio(wav_bytes: bytes) -> tuple[bytes | None, str, bool]:
     """
     POST WAV to the gateway with tts=true.
-    Returns (wav_bytes, text) — wav_bytes is set when gateway returns audio/wav
-    (external TTS active), text is set when gateway returns JSON (local TTS fallback).
+    Returns (wav_bytes, text, understood):
+      - wav_bytes is set when gateway returns audio/wav (external TTS active),
+      - text is set when gateway returns JSON (local TTS fallback),
+      - understood is False for no_speech / errors / unreachable gateway. The
+        caller uses it to NOT open a follow-up turn on a non-answer (otherwise
+        echo or "I didn't understand you" loops endlessly).
     """
     headers = {}
     if GATEWAY_API_KEY:
@@ -414,22 +418,22 @@ def _send_audio(wav_bytes: bytes) -> tuple[bytes | None, str]:
 
         if resp.headers.get("content-type", "").startswith("audio/"):
             logger.info(f"[Gateway] Received WAV reply ({len(resp.content)} bytes)")
-            return resp.content, ""
+            return resp.content, "", True
 
         data = resp.json()
         logger.info(f"[Gateway] Received JSON reply: {data}")
         if data.get("error") == "no_speech":
-            return None, "Ich habe dich leider nicht verstanden."
+            return None, "Ich habe dich leider nicht verstanden.", False
         if data.get("error"):
-            return None, f"Fehler: {data['error']}"
-        return None, data.get("reply") or ""
+            return None, f"Fehler: {data['error']}", False
+        return None, data.get("reply") or "", True
 
     except requests.exceptions.ConnectionError:
         logger.error(f"[Gateway] Cannot connect to {GATEWAY_URL}")
-        return None, "Gateway nicht erreichbar."
+        return None, "Gateway nicht erreichbar.", False
     except Exception as e:
         logger.error(f"[Gateway] Request failed: {e}")
-        return None, "Fehler beim Senden."
+        return None, "Fehler beim Senden.", False
 
 
 # ---------------------------------------------------------------------------
@@ -486,7 +490,7 @@ def main() -> None:
                             logger.info("[Followup] No follow-up speech — returning to wake word")
                         break
 
-                    wav_reply, text_reply = _send_audio(_pcm_to_wav(pcm))
+                    wav_reply, text_reply, understood = _send_audio(_pcm_to_wav(pcm))
                     _led(*COLOR_SPEAKING, LED_BRIGHTNESS)    # grün — speaking
                     if wav_reply:
                         _aplay(wav_reply)
@@ -494,13 +498,21 @@ def main() -> None:
                         _speak(text_reply)
                     _led_off()
 
-                    if not FOLLOWUP_ENABLED:
+                    # A non-answer (no speech understood, gateway error /
+                    # unreachable) must NOT open a follow-up turn — otherwise the
+                    # "I didn't understand you" reply loops forever.
+                    if not understood or not FOLLOWUP_ENABLED:
                         break
-                    # Drain audio buffered during playback so the tail of our
-                    # own voice / echo doesn't fake a speech onset.
+                    # Flush ALL mic audio captured during playback (the
+                    # assistant's own voice), then discard a short tail for room
+                    # echo/reverb. A fixed-size drain alone leaves seconds of our
+                    # own speech in the buffer on long replies, which then fakes
+                    # a follow-up onset and loops endlessly.
                     try:
-                        drain_frames = max(CHUNK_FRAMES, int(SAMPLE_RATE * FOLLOWUP_DRAIN_SECONDS))
-                        stream.read(drain_frames)
+                        while stream.read_available > 0:
+                            stream.read(stream.read_available)
+                        tail = max(CHUNK_FRAMES, int(SAMPLE_RATE * FOLLOWUP_DRAIN_SECONDS))
+                        stream.read(tail)
                     except Exception:
                         pass
                     initial_timeout = FOLLOWUP_INITIAL_TIMEOUT
