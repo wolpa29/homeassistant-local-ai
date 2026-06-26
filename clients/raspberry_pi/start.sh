@@ -26,95 +26,44 @@ section() { echo -e "\n${CYAN}=== $* ===${NC}"; }
 # Dimmed one-line explanation printed above a prompt so the user knows what it does.
 hint()    { echo -e "    ${DIM}$*${NC}"; }
 
-# Live mic-level meter - helps pick VAD_SILENCE_THRESHOLD without guessing.
-# Shows the current mic level (same int16 RMS unit the client uses) continuously
-# while you talk/move around the room. Type your chosen threshold WHILE watching,
-# press Enter to confirm. One Python process owns the terminal so the live bar
-# and your typing don't clobber each other: audio comes from the arecord pipe on
-# stdin, keystrokes are read straight from /dev/tty. Sets the global VAD_MEASURED
-# to the number you typed, or leaves it empty if you entered nothing / it failed.
+# Stop the voice-client service (if running) so the microphone is free, run the
+# given command, then restart the service. The running client holds the mic
+# exclusively, so any direct capture needs it stopped first.
+with_mic_free() {
+    # Status messages go to stderr so a caller that captures stdout (the picker
+    # reading mic_level.py's value) is not polluted by them.
+    local was_active="" rc=0
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        was_active=1
+        info "Stopping ${SERVICE_NAME} to free the microphone..." >&2
+        sudo systemctl stop "$SERVICE_NAME" >&2 || true
+        sleep 1
+    fi
+    "$@" || rc=$?
+    if [[ -n "$was_active" ]]; then
+        info "Restarting ${SERVICE_NAME}..." >&2
+        sudo systemctl start "$SERVICE_NAME" >&2 || true
+    fi
+    return $rc
+}
+
+# Interactive picker: show the live mic level (via mic_level.py, same sounddevice
+# capture the client uses) while you type a threshold, press Enter to confirm.
+# Sets the global VAD_MEASURED to the number you typed, or empty on cancel/fail.
 measure_mic_level() {
     VAD_MEASURED=""
     local py="$INSTALL_DIR/venv/bin/python3"
-    if [[ ! -x "$py" ]]; then
-        warn "venv Python not found - skipping measurement."
+    if [[ ! -x "$py" || ! -f "$INSTALL_DIR/mic_level.py" ]]; then
+        warn "mic_level.py / venv not found - skipping measurement."
         return 0
     fi
-
-    # The running client holds the microphone exclusively, so arecord would get
-    # no audio. Stop it for the measurement and bring it back afterwards.
-    local was_active=""
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        was_active=1
-        info "Stopping ${SERVICE_NAME} to free the microphone..."
-        sudo systemctl stop "$SERVICE_NAME" || true
-        sleep 1
-    fi
-
-    local recfile; recfile="$(mktemp)"
     echo "  Talk / move around the room and watch the level."
     echo "  Type the threshold you want while watching, then press Enter."
     echo "  (Rule of thumb: clearly above the quiet level, clearly below speech.)"
-    # arecord dies with SIGPIPE when the meter exits; '|| true' keeps pipefail happy.
-    arecord -D "$ALSA_INPUT_DEVICE" -f S16_LE -c 1 -r 16000 -t raw 2>/dev/null \
-      | RECFILE="$recfile" "$py" - <<'PY' || true
-import os, sys, select, termios, tty
-import numpy as np
-
-CHUNK = 1280  # 80 ms @ 16 kHz - same chunk size the client's VAD uses
-recfile = os.environ["RECFILE"]
-
-tty_fd = os.open("/dev/tty", os.O_RDWR)
-old = termios.tcgetattr(tty_fd)
-tty.setcbreak(tty_fd)            # read keys one at a time, no line buffering
-
-
-def w(s: str) -> None:
-    os.write(tty_fd, s.encode())
-
-
-typed = ""
-peak = 0
-got_audio = False
-try:
-    while True:
-        raw = sys.stdin.buffer.read(CHUNK * 2)   # ~80 ms of audio, blocks
-        if len(raw) < 2:
-            break
-        got_audio = True
-        x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
-        rms = int((x ** 2).mean() ** 0.5) if x.size else 0
-        peak = max(peak, rms)
-        bar = "#" * min(30, rms // 50)
-        # \r + clear-line, then redraw the whole line incl. what was typed so far
-        w(f"\r\033[2K  RMS {rms:5d}  peak {peak:5d} |{bar:<30}|  threshold: {typed}_")
-        # drain any keystrokes that arrived during this chunk (non-blocking)
-        while select.select([tty_fd], [], [], 0)[0]:
-            ch = os.read(tty_fd, 1)
-            if ch in (b"\r", b"\n"):
-                if typed:
-                    with open(recfile, "w") as f:
-                        f.write(typed)
-                raise SystemExit
-            if ch in (b"\x7f", b"\x08"):          # backspace
-                typed = typed[:-1]
-            elif ch.isdigit():
-                typed += ch.decode()
-finally:
-    termios.tcsetattr(tty_fd, termios.TCSADRAIN, old)
-    if not got_audio:
-        w("\n  No audio from the microphone - is the device busy or wrong?\n")
-    else:
-        w("\n")
-    os.close(tty_fd)
-PY
-    [[ -s "$recfile" ]] && VAD_MEASURED="$(cat "$recfile")"
-    rm -f "$recfile"
-
-    if [[ -n "$was_active" ]]; then
-        info "Restarting ${SERVICE_NAME}..."
-        sudo systemctl start "$SERVICE_NAME" || true
-    fi
+    # Pass the chosen device explicitly: during first-time setup .env does not
+    # exist yet, so mic_level.py could not read ALSA_INPUT_DEVICE from it.
+    VAD_MEASURED="$(with_mic_free env ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-plughw:1,0}" \
+        "$py" "$INSTALL_DIR/mic_level.py" --pick || true)"
 }
 
 ask() {
@@ -169,6 +118,23 @@ if [[ "${1:-}" == "measure" ]]; then
     else
         info "No value entered - .env unchanged."
     fi
+    exit 0
+fi
+
+# Subcommand:  bash start.sh level  -> just show the live mic level (view only)
+# until Ctrl-C. Handy for watching room noise / mic gain at any time.
+if [[ "${1:-}" == "level" ]]; then
+    if [[ -f "$INSTALL_DIR/.env" ]]; then
+        ALSA_INPUT_DEVICE="$(grep -E '^ALSA_INPUT_DEVICE=' "$INSTALL_DIR/.env" | cut -d= -f2-)"
+    fi
+    ALSA_INPUT_DEVICE="${ALSA_INPUT_DEVICE:-plughw:1,0}"
+    py="$INSTALL_DIR/venv/bin/python3"
+    if [[ ! -x "$py" || ! -f "$INSTALL_DIR/mic_level.py" ]]; then
+        error "mic_level.py / venv not found in ${INSTALL_DIR}"
+        exit 1
+    fi
+    echo -e "${CYAN}Microphone level meter${NC} (device: ${ALSA_INPUT_DEVICE})"
+    with_mic_free env ALSA_INPUT_DEVICE="$ALSA_INPUT_DEVICE" "$py" "$INSTALL_DIR/mic_level.py"
     exit 0
 fi
 
@@ -232,10 +198,12 @@ if [[ ! -f "$INSTALL_DIR/voice_client.py" ]]; then
     }
 
     download_file "voice_client.py"
+    download_file "mic_level.py"
     download_file "requirements.txt"
     download_file "start.sh"
     download_file "stop.sh"
-    chmod +x "$INSTALL_DIR/start.sh" "$INSTALL_DIR/stop.sh"
+    download_file "level.sh"
+    chmod +x "$INSTALL_DIR/start.sh" "$INSTALL_DIR/stop.sh" "$INSTALL_DIR/level.sh"
 fi
 
 # ---------------------------------------------------------------------------
@@ -490,4 +458,6 @@ fi
 echo "  Live logs : journalctl -u ${SERVICE_NAME} -f"
 echo "  Stop      : bash ${INSTALL_DIR}/stop.sh"
 echo "  Config    : nano ${INSTALL_DIR}/.env  then: bash ${INSTALL_DIR}/start.sh"
+echo "  Mic level : bash ${INSTALL_DIR}/level.sh            (watch the live level)"
+echo "  Set thresh: bash ${INSTALL_DIR}/start.sh measure    (pick VAD threshold)"
 echo
