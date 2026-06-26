@@ -24,14 +24,28 @@ GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/mai
 # Docker Compose detection
 # ---------------------------------------------------------------------------
 if ! docker info >/dev/null 2>&1; then
-    echo "[infra] Docker not accessible — adding $USER to docker group…"
+    echo
+    echo "  Docker is not accessible — user '${USER}' is not in the docker group."
+    echo "  This is a one-time setup so Docker works without sudo."
+    echo
+    echo "  Fix automatically and continue? (runs: sudo usermod -aG docker ${USER})"
+    read -rp "  [y/N]: " fix_choice
+    if [[ "${fix_choice,,}" != "y" && "${fix_choice,,}" != "yes" ]]; then
+        echo
+        echo "  To fix manually:"
+        echo "    sudo usermod -aG docker \$USER"
+        echo "    newgrp docker"
+        echo "    bash start.sh"
+        exit 1
+    fi
     sudo usermod -aG docker "$USER"
-    echo "[infra] Done. Run this to activate without logout:"
-    echo
-    echo "    newgrp docker"
-    echo "    bash start.sh"
-    echo
-    exit 0
+    if [[ ! -f "${BASH_SOURCE[0]}" ]]; then
+        wget -q -O "$INSTALL_DIR/start.sh" "${GITHUB_RAW}/start.sh"
+        chmod +x "$INSTALL_DIR/start.sh"
+        exec sg docker "bash $INSTALL_DIR/start.sh"
+    else
+        exec sg docker "bash ${BASH_SOURCE[0]}"
+    fi
 fi
 
 if docker compose version >/dev/null 2>&1; then
