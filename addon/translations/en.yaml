@@ -9,7 +9,7 @@ configuration:
     name: 🔵 Services (which features run)
     description: >-
       Turn the three features on or off here. A disabled service just sleeps but
-      stays in the container. **Important:** which fields below are required depends
+      stays in the container. Important: which fields below are required depends
       on what you enable here.
     voice_gateway:
       name: 🔵 Enable Voice Gateway
@@ -25,18 +25,18 @@ configuration:
       name: 🔵 Enable Telegram Bot
       description: >-
         Default: on · Bot for voice and text commands plus inline quick-action menus.
-        When on, **Bot Token** and **Chat ID** below become required.
+        When on, Bot Token and Chat ID below become required.
 
   telegram:
     name: 🔴 Telegram (required if Telegram Bot is on)
     description: >-
-      🔴 Required **as soon as the Telegram Bot above is enabled** — otherwise the
+      🔴 Required as soon as the Telegram Bot above is enabled, otherwise the
       add-on won't start. Not using Telegram? Turn the bot off above, then you can
       leave this section collapsed.
     bot_token:
       name: 🔴 Bot Token
       description: >-
-        🔴 REQUIRED if Telegram Bot is on · Get one from **@BotFather** on Telegram.
+        🔴 REQUIRED if Telegram Bot is on · Get one from @BotFather on Telegram.
         If empty (and bot is on): the add-on won't start and reports the error in the log.
     chat_id:
       name: 🔴 Chat ID
@@ -48,7 +48,7 @@ configuration:
   home_assistant:
     name: ⚪ Home Assistant (defaults are fine)
     description: >-
-      ✅ Can usually stay collapsed — the defaults work inside the add-on. Only touch
+      ✅ Can usually stay collapsed, the defaults work inside the add-on. Only touch
       this for an external HA instance.
     url:
       name: ⚪ URL
@@ -58,7 +58,7 @@ configuration:
     token:
       name: ⚪ Token
       description: >-
-        Optional · **Leave empty.** The add-on uses the auto-injected supervisor
+        Optional · Leave empty. The add-on uses the auto-injected supervisor
         token automatically. Only set a long-lived token for an external HA instance.
     service_timeout:
       name: ⚪ Service call timeout (s)
@@ -67,14 +67,14 @@ configuration:
     dry_run:
       name: ⚪ Dry-run mode
       description: >-
-        Default: off · On = service calls are only logged, **nothing is actually
-        switched**. Good for testing without real actions.
+        Default: off · On = service calls are only logged, nothing is actually
+        switched. Good for testing without real actions.
 
   lmstudio:
-    name: 🔴 LM Studio (required — the LLM)
+    name: 🔴 LM Studio (required, the LLM)
     description: >-
-      🔴 The language model that understands everything. **Required as soon as Voice
-      Gateway or Telegram Bot is on** (i.e. the default setup). Without it, no voice
+      🔴 The language model that understands everything. Required as soon as Voice
+      Gateway or Telegram Bot is on (i.e. the default setup). Without it, no voice
       control works.
     url:
       name: 🔴 URL
@@ -84,7 +84,7 @@ configuration:
     model:
       name: 🔴 Model
       description: >-
-        🔴 Must exactly match the model **loaded** in LM Studio, e.g.
+        🔴 Must exactly match the model loaded in LM Studio, e.g.
         `qwen2.5-7b-instruct`. Wrong name = every LLM request fails.
     api_key:
       name: ⚪ API Key
@@ -103,7 +103,7 @@ configuration:
     no_think:
       name: ⚪ Suppress think tags
       description: >-
-        Default: on · Strips `<think>…</think>` from the reply. Keep on for reasoning
+        Default: on · Strips `<think>...</think>` from the reply. Keep on for reasoning
         models like QwQ or DeepSeek-R1.
     context_length:
       name: ⚪ Context length
@@ -122,9 +122,9 @@ configuration:
         trigger in one request.
 
   whisper:
-    name: ⚪ Whisper (Speech → Text)
+    name: ⚪ Whisper (Speech -> Text)
     description: >-
-      Optional · External speech-to-text server. **Empty = text commands only**, no
+      Optional · External speech-to-text server. Empty = text commands only, no
       audio recordings. For text-only operation you can leave this collapsed.
     url:
       name: ⚪ URL
@@ -138,10 +138,10 @@ configuration:
         when a URL is set above.
 
   tts:
-    name: ⚪ TTS (Text → Speech)
+    name: ⚪ TTS (Text -> Speech)
     description: >-
-      Optional · External text-to-speech server for spoken replies. **Empty = no
-      speech output**, text only. For text-only operation leave collapsed.
+      Optional · External text-to-speech server for spoken replies. Empty = no
+      speech output, text only. For text-only operation leave collapsed.
     url:
       name: ⚪ URL
       description: >-
@@ -156,12 +156,12 @@ configuration:
   gateways:
     name: ⚙️ Gateway Ports & Auth (Advanced)
     description: >-
-      ✅ Advanced — **can stay collapsed, the defaults work.** Only touch this if you
+      ✅ Advanced, can stay collapsed, the defaults work. Only touch this if you
       need to change ports or secure the gateways.
     voice_port:
       name: ⚪ Voice Gateway port
       description: >-
-        Optional · Default: 8765 · If changed, also update the add-on **Network** tab.
+        Optional · Default: 8765 · If changed, also update the add-on Network tab.
     voice_api_key:
       name: ⚪ Voice Gateway API key
       description: >-
@@ -186,7 +186,7 @@ configuration:
   rag:
     name: ⚙️ RAG / Entity Retrieval (Advanced)
     description: >-
-      ✅ Advanced — **the defaults work, leave collapsed unless tuning.** Semantic
+      ✅ Advanced, the defaults work, leave collapsed unless tuning. Semantic
       vector search over your HA entities. After changing entities, rebuild the index
       with `/rag_rebuild` in Telegram.
     enabled:
@@ -226,7 +226,7 @@ configuration:
   preprocessor:
     name: ⚙️ LLM Preprocessor (Advanced)
     description: >-
-      ✅ Advanced — **the default works, leave collapsed unless tuning.** A small
+      ✅ Advanced, the default works, leave collapsed unless tuning. A small
       extra LLM call before the main pipeline: classifies intent, fixes STT errors,
       and rewrites the query for better RAG results.
     enabled:
@@ -255,7 +255,7 @@ configuration:
   advanced:
     name: ⚙️ Fallback & History (Advanced)
     description: >-
-      ✅ Advanced — **the defaults work, leave collapsed unless tuning.** What happens
+      ✅ Advanced, the defaults work, leave collapsed unless tuning. What happens
       when no entity matches, and how much conversation history the LLM sees.
     fallback_mode:
       name: ⚪ Fallback mode
@@ -273,7 +273,7 @@ configuration:
     history_size:
       name: ⚪ Conversation history size
       description: >-
-        Optional · Default: 0 (= off) · How many past user turns the LLM sees per request.
+        Optional · Default: 2 · How many past user turns the LLM sees per request. 0 = off.
     history_include_assistant:
       name: ⚪ Include assistant replies in history
       description: >-

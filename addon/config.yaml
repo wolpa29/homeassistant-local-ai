@@ -1,5 +1,5 @@
 name: Home Assistant Local AI
-version: "1.5.0"
+version: "1.5.1"
 slug: homeassistant_local_ai
 description: >-
   Control Home Assistant with a local LLM via voice, Telegram, and notifications.
@@ -82,7 +82,7 @@ options:
     fallback_mode: 0
     fallback_rest_max_entities: 0
     fallback_rest_domains: "light,switch,sensor,binary_sensor,climate,automation,cover"
-    history_size: 0
+    history_size: 2
     history_include_assistant: true
     history_append_executions: false
 

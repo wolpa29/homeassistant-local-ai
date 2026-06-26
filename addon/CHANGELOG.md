@@ -1,69 +1,64 @@
 # Changelog
 
+## 1.5.1 - 2026-06-26
+
+- `advanced.history_size` default 0 -> 2.
+
 ## 1.5.0 - 2026-06-26
 
-- Config UI overhauled for clarity. Every field name now starts with a status dot so you can see at a glance what to set **without expanding anything**: 🔴 = required (in the default setup), ⚪ = optional / has a working default, ⚙️ = advanced section you can leave collapsed.
-- Every description rewritten to a consistent format: required/optional · default value · **what happens if you leave it empty**.
-- Section descriptions now say plainly whether a whole section can stay collapsed (e.g. "✅ Advanced — the defaults work").
-- Added a full German translation (`translations/de.yaml`). German Home Assistant installs previously showed few or no field descriptions; now every field is documented in German.
-- Note: Home Assistant's add-on UI cannot mark *conditionally* required fields red (e.g. the Telegram token is only required when the Telegram bot is on), so the dots plus the existing startup check — which stops the add-on and names the exact missing field in the log — cover that case.
+- Config field names prefixed with status dots (required / optional / advanced); descriptions reformatted.
+- Added German translation (`translations/de.yaml`).
 
 ## 1.4.1 - 2026-06-26
 
-- Fix: renamed internal lib directory and service run scripts to match new repo name (homeassistant-local-ai), fixing startup crash on fresh installs.
+- Fix: renamed internal lib dir and service run scripts to match repo name; fixes startup crash on fresh installs.
 
 ## 1.4.0 - 2026-06-26
 
-- Onboarding simplified: the README is now a linear, numbered setup guide (each step says what it does and which port it uses), with an "Add to my Home Assistant" button.
-- New combined infra stack: `bash infra/start.sh` starts Whisper and TTS together, waits until both are healthy, and prints the exact URLs to paste into the add-on.
-- Add-on config: advanced sections (RAG, Preprocessor, Fallback & History, Gateways) are now marked as skippable so beginners know the defaults are fine.
-- Docs: new "Quick start (5 fields)" and "LM Studio in one minute" sections; the bare-metal/systemd guide moved out of the README into `docs/bare-metal.md`.
+- Combined infra stack: `infra/start.sh` starts Whisper + TTS and prints their URLs.
+- Advanced config sections marked as skippable.
 - Removed dead battery-monitor config (`CHECK_INTERVAL_SECONDS`, `BATTERY_THRESHOLD`).
 
 ## 1.3.7 - 2026-05-25
 
-- Made LLM command parsing safer and more consistent.
+- Safer LLM command parsing; added action validation and JSON retry handling.
 - Sanitized execution history so internal `[OK]` logs are not copied into replies.
-- Added action validation, shared JSON retry handling, and safer follow-up history.
 
 ## 1.2.7 - 2026-05-09
 
-- Depersonalised the system prompts: all setup-specific examples (personal names, pool, upstairs/downstairs, blinds, room labels) removed from `prompts_de.yaml` and `prompts_en.yaml`. Only the universal HA contract remains (JSON schema, action names, domains, service_data).
-- Restructured `pre_llm_memory.md` and `post_llm_memory.md`: default content is empty, with an expanded inspiration block inside HTML comments, users add their own setup hints (names, floors, nicknames, STT corrections, never-do rules) by uncommenting or rewriting.
-- Documentation: new "Memory files, your per-setup tuning" section in DOCS.md and a short pointer from the README.
+- Depersonalised system prompts (`prompts_de.yaml`, `prompts_en.yaml`); only the universal HA contract remains.
+- `pre_llm_memory.md` / `post_llm_memory.md` default to empty for per-setup tuning.
 
 ## 1.2.6 - 2026-05-09
 
-- Auto-rebuild the RAG index on add-on startup when `rag.enabled=true`. Progress is visible in the add-on log; failures only log a warning and never block service startup.
+- Auto-rebuild RAG index on startup when `rag.enabled=true`; failures only warn, never block.
 
 ## 1.2.5 - 2026-05-09
 
-- Fix: corrected the GHCR image path after the GitHub account rename (`wolpay29` to `wolpa29`).
+- Fix: corrected GHCR image path after account rename (`wolpay29` -> `wolpa29`).
 
 ## 1.2.4 - 2026-05-09
 
-- Telegram ReplyKeyboard now stays visible across actions; a fresh carrier message is sent after each action so the keyboard survives even with 24h chat auto-delete enabled.
+- Telegram ReplyKeyboard stays visible across actions.
 
 ## 1.2.3 - 2026-05-03
 
-- Each config section now shows a summary of all its fields in the section description.
-- Logo Update
+- Section descriptions now summarise their fields.
 
 ## 1.2.1 - 2026-05-03
 
-- Fix: field descriptions now appear above config inputs in HA UI (removed incorrect `fields:` wrapper from translations).
-- Fix: bot token no longer appears in plaintext in addon logs.
+- Fix: field descriptions render in HA UI (removed wrong `fields:` wrapper).
+- Fix: bot token no longer logged in plaintext.
 
 ## 1.2.0 - 2026-05-02
 
-- Config UI now has 10 collapsible sections (Services, Telegram, Home Assistant, LM Studio, Whisper, TTS, Gateways, RAG, Preprocessor, Fallback & History).
+- Config UI split into 10 collapsible sections.
 
 ## 1.1.0 - 2026-05-02
 
-- Internal Whisper removed, external STT server only (`whisper.url`).
-- Debian base image, fixes `sqlite-vec` install on aarch64.
-- armv7 dropped, HAOS on RPi 3/4 uses aarch64.
+- Internal Whisper removed, external STT only (`whisper.url`).
+- Debian base image (fixes `sqlite-vec` on aarch64); armv7 dropped.
 
 ## 1.0.0 - 2026-04-27
 
-Initial release. Three services (`voice_gateway`, `notify_gateway`, `telegram_bot`) in one container under s6-overlay.
+- Initial release. Three services (`voice_gateway`, `notify_gateway`, `telegram_bot`) in one container under s6-overlay.
