@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 - 2026-06-26
+
+- Config UI overhauled for clarity. Every field name now starts with a status dot so you can see at a glance what to set **without expanding anything**: 🔴 = required (in the default setup), ⚪ = optional / has a working default, ⚙️ = advanced section you can leave collapsed.
+- Every description rewritten to a consistent format: required/optional · default value · **what happens if you leave it empty**.
+- Section descriptions now say plainly whether a whole section can stay collapsed (e.g. "✅ Advanced — the defaults work").
+- Added a full German translation (`translations/de.yaml`). German Home Assistant installs previously showed few or no field descriptions; now every field is documented in German.
+- Note: Home Assistant's add-on UI cannot mark *conditionally* required fields red (e.g. the Telegram token is only required when the Telegram bot is on), so the dots plus the existing startup check — which stops the add-on and names the exact missing field in the log — cover that case.
+
 ## 1.4.1 - 2026-06-26
 
 - Fix: renamed internal lib directory and service run scripts to match new repo name (homeassistant-local-ai), fixing startup crash on fresh installs.

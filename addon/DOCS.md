@@ -94,6 +94,14 @@ That is all the add-on needs from the LLM side. No auth is required unless you e
 
 ## Configuration
 
+**Reading the config screen.** Every field name starts with a status dot so you can see what matters before expanding anything:
+
+- 🔴 **Required** in the default setup, fill this in or it won't work.
+- ⚪ **Optional**, has a sensible default, safe to leave as-is.
+- ⚙️ **Advanced section**, the defaults work, leave it collapsed unless you're tuning.
+
+Each description follows the same pattern: `required/optional · default · what happens if you leave it empty`. Home Assistant's add-on UI can't turn a field red only when another service is on, so the dots plus the startup check below cover the conditional cases.
+
 **Required fields**, the add-on refuses to start if these are missing:
 
 - `telegram.bot_token`, required when `services.telegram_bot` is on

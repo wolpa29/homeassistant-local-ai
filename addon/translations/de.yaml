@@ -1,0 +1,294 @@
+configuration:
+  language:
+    name: ⚪ Sprache
+    description: >-
+      Optional · Standard: `de` · Sprache für Oberfläche, LLM-Prompts und
+      Whisper-Transkription. Nur `de` oder `en`. Wenn unverändert: alles läuft auf Deutsch.
+
+  services:
+    name: 🔵 Dienste (welche Funktionen laufen)
+    description: >-
+      Hier schaltest du die drei Funktionen an/aus. Ein ausgeschalteter Dienst
+      schläft nur, bleibt aber im Container. **Wichtig:** Wovon ein Feld weiter
+      unten Pflicht ist, hängt davon ab, was du hier anschaltest.
+    voice_gateway:
+      name: 🔵 Voice-Gateway aktivieren
+      description: >-
+        Standard: an · HTTP-Schnittstelle auf Port 8765 für RPi/ESP32-Audio und
+        Textbefehle. Aus = kein Sprach-Gateway, Port 8765 ungenutzt.
+    notify_gateway:
+      name: 🔵 Notify-Gateway aktivieren
+      description: >-
+        Standard: an · HTTP-Schnittstelle auf Port 8766. HA-Automationen schicken
+        hierher, um Nachrichten an Telegram und TTS zu verteilen. Aus = keine
+        Benachrichtigungs-Weiterleitung.
+    telegram_bot:
+      name: 🔵 Telegram-Bot aktivieren
+      description: >-
+        Standard: an · Bot für Sprach- und Textbefehle plus Schnellaktions-Menüs.
+        Wenn an, werden unten **Bot-Token** und **Chat-ID** zur Pflicht.
+
+  telegram:
+    name: 🔴 Telegram (Pflicht wenn Telegram-Bot an)
+    description: >-
+      🔴 Pflicht, **sobald der Telegram-Bot oben aktiv ist** — sonst startet das
+      Add-on nicht. Wenn du Telegram nicht nutzt: Bot oben ausschalten, dann kannst
+      du diese Sektion zugeklappt lassen.
+    bot_token:
+      name: 🔴 Bot-Token
+      description: >-
+        🔴 PFLICHT wenn Telegram-Bot an · Holst du dir bei **@BotFather** in
+        Telegram. Wenn leer (und Bot an): Add-on startet nicht und meldet den Fehler im Log.
+    chat_id:
+      name: 🔴 Chat-ID
+      description: >-
+        🔴 PFLICHT wenn Telegram-Bot an · Deine numerische Telegram-User-ID (z.B.
+        `123456789`). Der Bot antwortet nur dieser ID. Wenn `0` (und Bot an):
+        Add-on startet nicht.
+
+  home_assistant:
+    name: ⚪ Home Assistant (Standard reicht)
+    description: >-
+      ✅ Kann meist zugeklappt bleiben — die Standardwerte funktionieren innerhalb
+      des Add-ons. Nur anfassen bei externer HA-Instanz.
+    url:
+      name: ⚪ URL
+      description: >-
+        Optional · Standard: `http://supervisor/core` (läuft im Add-on). Nur ändern
+        für eine externe HA-Instanz.
+    token:
+      name: ⚪ Token
+      description: >-
+        Optional · **Leer lassen.** Das Add-on nutzt automatisch den eingebauten
+        Supervisor-Token. Nur bei externer HA-Instanz einen Long-Lived-Token eintragen.
+    service_timeout:
+      name: ⚪ Timeout für Service-Aufrufe (s)
+      description: >-
+        Optional · Standard: 15 · Sekunden, die auf einen HA-Service-Aufruf
+        gewartet wird, bevor abgebrochen wird.
+    dry_run:
+      name: ⚪ Testmodus (Dry-Run)
+      description: >-
+        Standard: aus · An = Service-Aufrufe werden nur protokolliert, **nichts wird
+        wirklich geschaltet**. Gut zum Testen ohne echte Aktionen.
+
+  lmstudio:
+    name: 🔴 LM Studio (Pflicht — das LLM)
+    description: >-
+      🔴 Das Sprachmodell, das alles versteht. **Pflicht, sobald Voice-Gateway oder
+      Telegram-Bot an ist** (also im Standard-Setup). Ohne läuft keine Sprachsteuerung.
+    url:
+      name: 🔴 URL
+      description: >-
+        🔴 PFLICHT (wenn Voice oder Telegram an) · Adresse deines LM-Studio-Servers,
+        z.B. `http://192.168.1.10:1234`. Wenn leer: Add-on startet nicht.
+    model:
+      name: 🔴 Modell
+      description: >-
+        🔴 Muss exakt zum in LM Studio **geladenen** Modell passen, z.B.
+        `qwen2.5-7b-instruct`. Falscher Name = jede LLM-Anfrage schlägt fehl.
+    api_key:
+      name: ⚪ API-Key
+      description: >-
+        Optional · Leer lassen, wenn LM Studio keine Authentifizierung verlangt
+        (Standardfall).
+    timeout:
+      name: ⚪ Timeout (s)
+      description: >-
+        Optional · Standard: 30 · Sekunden Wartezeit auf die LLM-Antwort, bevor
+        abgebrochen wird.
+    temperature:
+      name: ⚪ Temperatur
+      description: >-
+        Optional · Standard: 0.1 · Niedriger = zuverlässiger und weniger kreativ.
+        Für Steuerbefehle niedrig lassen.
+    no_think:
+      name: ⚪ Think-Tags unterdrücken
+      description: >-
+        Standard: an · Entfernt `<think>…</think>` aus der Antwort. Anlassen bei
+        Reasoning-Modellen wie QwQ oder DeepSeek-R1.
+    context_length:
+      name: ⚪ Kontextlänge
+      description: >-
+        Optional · Standard: 8000 · Token-Fenster. Nur relevant für Fallback-Modus 2.
+    mcp_allowed_tools:
+      name: ⚪ Erlaubte MCP-Tools
+      description: >-
+        Optional · Komma-getrennte Whitelist für MCP-Fallback (Modus 2). Leer = alle
+        Tools erlaubt. Nur relevant bei Fallback-Modus 2.
+    max_actions_per_command:
+      name: ⚪ Max. Aktionen pro Befehl
+      description: >-
+        Optional · Standard: 0 (= unbegrenzt) · Begrenzt, wie viele HA-Aktionen das
+        LLM in einer Anfrage auslösen darf.
+
+  whisper:
+    name: ⚪ Whisper (Sprache → Text)
+    description: >-
+      Optional · Externer Spracherkennungs-Server. **Leer = nur Textbefehle**, keine
+      Sprachaufnahmen. Für reinen Textbetrieb kannst du die Sektion zugeklappt lassen.
+    url:
+      name: ⚪ URL
+      description: >-
+        Optional · z.B. `http://192.168.1.10:10300/v1/audio/transcriptions`. Wenn
+        leer: Sprachaufnahmen werden nicht verarbeitet (nur Text funktioniert).
+    model:
+      name: ⚪ Modell
+      description: >-
+        Optional · Muss zum auf dem Whisper-Server geladenen Modell passen. Nur
+        relevant, wenn oben eine URL gesetzt ist.
+
+  tts:
+    name: ⚪ TTS (Text → Sprache)
+    description: >-
+      Optional · Externer Sprachausgabe-Server für gesprochene Antworten. **Leer =
+      keine Sprachausgabe**, nur Text. Für reinen Textbetrieb zugeklappt lassen.
+    url:
+      name: ⚪ URL
+      description: >-
+        Optional · z.B. `http://192.168.1.10:10400/tts`. Wenn leer: keine
+        Sprachausgabe (Antworten kommen nur als Text).
+    voice:
+      name: ⚪ Stimme (Voice-ID)
+      description: >-
+        Optional · Standard: `de_DE-thorsten-low` · Stimm-ID, die an den TTS-Server
+        gesendet wird. Nur relevant, wenn oben eine URL gesetzt ist.
+
+  gateways:
+    name: ⚙️ Gateway-Ports & Auth (Erweitert)
+    description: >-
+      ✅ Erweitert — **kann zugeklappt bleiben, die Standardwerte funktionieren.**
+      Nur anfassen, wenn du Ports ändern oder die Gateways absichern musst.
+    voice_port:
+      name: ⚪ Voice-Gateway-Port
+      description: >-
+        Optional · Standard: 8765 · Bei Änderung auch im Tab **Netzwerk** des
+        Add-ons anpassen.
+    voice_api_key:
+      name: ⚪ Voice-Gateway-API-Key
+      description: >-
+        Optional · Gemeinsames Geheimnis. Wenn gesetzt, müssen Clients den Header
+        `X-Api-Key` mitschicken. Leer = keine Absicherung.
+    voice_telegram_push:
+      name: ⚪ Voice-Antworten an Telegram weiterleiten
+      description: >-
+        Standard: an · Schickt für jeden verarbeiteten Sprachbefehl eine
+        Telegram-Nachricht.
+    voice_reply_with_transcript:
+      name: ⚪ Transkript in Voice-Antwort einschließen
+      description: >-
+        Standard: an · Nimmt den erkannten Sprachtext mit in die Telegram-Bestätigung auf.
+    notify_port:
+      name: ⚪ Notify-Gateway-Port
+      description: "Optional · Standard: 8766."
+    notify_http_timeout:
+      name: ⚪ Notify-HTTP-Timeout (s)
+      description: >-
+        Optional · Standard: 10 · Sekunden Wartezeit beim Weiterleiten einer
+        Benachrichtigung.
+
+  rag:
+    name: ⚙️ RAG / Entity-Suche (Erweitert)
+    description: >-
+      ✅ Erweitert — **die Standardwerte funktionieren, zugeklappt lassen, außer du
+      tunst.** Semantische Vektorsuche über deine HA-Entities. Nach Entity-Änderungen
+      Index per `/rag_rebuild` in Telegram neu bauen.
+    enabled:
+      name: ⚪ RAG aktivieren
+      description: >-
+        Standard: an · Aus = `entities.yaml` geht komplett ans LLM. An = Vektorsuche
+        liefert pro Anfrage die relevantesten Entities.
+    top_k:
+      name: ⚪ Top-K Kandidaten
+      description: "Optional · Standard: 15 · Max. Entities pro Anfrage."
+    keyword_boost:
+      name: ⚪ Keyword-Boost
+      description: >-
+        Optional · Standard: 0.3 · 0 = reine Vektorsuche. Höher = Stichwort-Treffer
+        zählen mehr.
+    distance_threshold:
+      name: ⚪ Distanz-Schwelle
+      description: >-
+        Optional · Standard: 0 (= aus) · Verwirft Kandidaten, die weiter als dieser
+        Wert entfernt sind.
+    embed_url:
+      name: ⚪ Embedding-URL
+      description: "Optional · Leer = nutzt `lmstudio.url`."
+    embed_api_key:
+      name: ⚪ Embedding-API-Key
+      description: "Optional · Leer = nutzt `lmstudio.api_key`."
+    embed_model:
+      name: ⚪ Embedding-Modell
+      description: >-
+        Optional · Standard: `text-embedding-nomic-embed-text-v2-moe` · Muss in
+        LM Studio geladen sein.
+    embed_dim:
+      name: ⚪ Embedding-Dimension
+      description: >-
+        Optional · Standard: 768 · Muss zur Ausgabedimension des Modells passen.
+        Änderung löst einen Index-Rebuild aus.
+
+  preprocessor:
+    name: ⚙️ LLM-Vorverarbeitung (Erweitert)
+    description: >-
+      ✅ Erweitert — **Standard funktioniert, zugeklappt lassen, außer du tunst.**
+      Kleiner zusätzlicher LLM-Aufruf vor der Hauptpipeline: erkennt die Absicht,
+      korrigiert STT-Fehler und schreibt die Anfrage für bessere RAG-Treffer um.
+    enabled:
+      name: ⚪ Vorverarbeitung aktivieren
+      description: >-
+        Standard: an · Ein extra LLM-Aufruf pro Anfrage. Empfohlen, wenn RAG an ist
+        und Sprache genutzt wird.
+    url:
+      name: ⚪ URL
+      description: "Optional · Leer = nutzt `lmstudio.url`."
+    api_key:
+      name: ⚪ API-Key
+      description: "Optional · Leer = nutzt `lmstudio.api_key`."
+    model:
+      name: ⚪ Modell
+      description: >-
+        Optional · Leer = nutzt `lmstudio.model`. Ein kleines schnelles Modell reicht,
+        z.B. Qwen 1.5B.
+    timeout:
+      name: ⚪ Timeout (s)
+      description: "Optional · Standard: 30."
+    temperature:
+      name: ⚪ Temperatur
+      description: "Optional · Standard: 0.1."
+
+  advanced:
+    name: ⚙️ Fallback & Verlauf (Erweitert)
+    description: >-
+      ✅ Erweitert — **Standard funktioniert, zugeklappt lassen, außer du tunst.**
+      Was passiert, wenn keine Entity passt, und wie viel Gesprächsverlauf das LLM sieht.
+    fallback_mode:
+      name: ⚪ Fallback-Modus
+      description: >-
+        Optional · Standard: 0 · 0 = Fehler zurückgeben. 1 = alle Live-Zustände holen
+        und erneut versuchen (Beta). 2 = an LM Studio mit MCP-Tools übergeben (Beta).
+    fallback_rest_max_entities:
+      name: ⚪ Fallback-REST max. Entities
+      description: >-
+        Optional · Standard: 0 (= kein Limit) · Nur Modus 1. Max. Entities, die ans
+        LLM gehen.
+    fallback_rest_domains:
+      name: ⚪ Fallback-REST-Domains
+      description: >-
+        Optional · Nur Modus 1. Komma-getrennte HA-Domains, z.B.
+        `light,switch,climate`.
+    history_size:
+      name: ⚪ Verlaufsgröße
+      description: >-
+        Optional · Standard: 0 (= aus) · Wie viele frühere Nutzer-Eingaben das LLM
+        pro Anfrage sieht.
+    history_include_assistant:
+      name: ⚪ Assistent-Antworten in Verlauf
+      description: >-
+        Standard: an · Das LLM sieht auch seine eigenen früheren Antworten, nicht nur
+        die Nutzer-Eingaben.
+    history_append_executions:
+      name: ⚪ Ausgeführte Aktionen an Verlauf anhängen
+      description: >-
+        Standard: aus · Fügt eine Zusammenfassung ausgeführter HA-Aktionen zur
+        gespeicherten Antwort hinzu.
