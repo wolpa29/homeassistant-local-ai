@@ -6,7 +6,10 @@
 #
 # Usage (first time):
 #   mkdir ai-infra && cd ai-infra
-#   curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/infra/start.sh | bash
+#   bash <(curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/infra/start.sh)
+#
+# NOTE: use  bash <(curl …)  — NOT  curl … | bash.  With a pipe the script's
+# stdin is the download stream, so interactive prompts can't read your input.
 #
 # Usage (after that):
 #   bash start.sh

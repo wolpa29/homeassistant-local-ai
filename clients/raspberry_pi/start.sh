@@ -7,7 +7,11 @@
 #
 # Usage (first time):
 #   mkdir voice-client && cd voice-client
-#   curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/clients/raspberry_pi/start.sh | bash
+#   bash <(curl -sSL https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/main/clients/raspberry_pi/start.sh)
+#
+# NOTE: use  bash <(curl …)  — NOT  curl … | bash.  With a pipe, the script's
+# stdin is the download stream, so the interactive prompts read garbage instead
+# of your answers. Process substitution keeps stdin attached to your terminal.
 #
 # Usage (after that):
 #   bash start.sh
@@ -242,9 +246,10 @@ EOF
     chmod 600 "$ENV_FILE"
     info ".env written."
 
-    # ALSA mixer setup
+    # ALSA mixer setup — ALSA_INPUT_DEVICE is already set from the prompts above,
+    # so we do NOT source the .env (sourcing it would execute any odd value as a
+    # shell command).
     section "7 — ALSA mixer setup"
-    set -a; source "$ENV_FILE"; set +a
     ALSA_CARD=$(echo "$ALSA_INPUT_DEVICE" | grep -oP '(?<=:)\d+(?=,)' || echo "1")
     info "Configuring ALSA mixer for card $ALSA_CARD…"
     run_amixer() { amixer -c "$ALSA_CARD" sset "$@" 2>/dev/null || true; }
