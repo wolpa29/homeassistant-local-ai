@@ -98,6 +98,10 @@ VAD_SILENCE_THRESHOLD: float = float(os.getenv("VAD_SILENCE_THRESHOLD", "500"))
 VAD_SILENCE_DURATION: float  = float(os.getenv("VAD_SILENCE_DURATION", "1.0"))
 VAD_MAX_DURATION: float      = float(os.getenv("VAD_MAX_DURATION", "10.0"))
 VAD_MIN_DURATION: float      = 0.4     # ignore clips shorter than this
+# Minimum number of loud (above-threshold) chunks an utterance must contain to be
+# sent. A near-silent clip (e.g. the beep echo plus silence) has very few and is
+# dropped — this stops Whisper from hallucinating text like "Vielen Dank." on it.
+VAD_MIN_VOICED_CHUNKS: int   = int(os.getenv("VAD_MIN_VOICED_CHUNKS", "3"))
 # Seconds after the wake word to wait for speech onset before cancelling.
 VAD_INITIAL_TIMEOUT: float   = float(os.getenv("VAD_INITIAL_TIMEOUT", "5.0"))
 
@@ -314,6 +318,19 @@ def _rms(chunk: np.ndarray) -> float:
     return float(np.sqrt(np.mean(chunk.astype(np.float32) ** 2)))
 
 
+def _drain_input(stream: sd.InputStream, tail_seconds: float = 0.0) -> None:
+    """Discard all currently-buffered mic audio (e.g. the beep or TTS echo that
+    accumulated while we were playing it), plus an optional fixed tail for room
+    reverb, so leftover sound can't be mistaken for a speech onset."""
+    try:
+        while stream.read_available > 0:
+            stream.read(stream.read_available)
+        if tail_seconds > 0:
+            stream.read(max(CHUNK_FRAMES, int(SAMPLE_RATE * tail_seconds)))
+    except Exception:
+        pass
+
+
 def _record_command(
     stream: sd.InputStream,
     initial_timeout: float | None = None,
@@ -333,6 +350,7 @@ def _record_command(
     silence_start: float | None = None
     speech_started = False
     loud_streak = 0
+    voiced_chunks = 0
     start_time = time.time()
 
     while True:
@@ -347,6 +365,7 @@ def _record_command(
 
         if rms > VAD_SILENCE_THRESHOLD:
             loud_streak += 1
+            voiced_chunks += 1
             if loud_streak >= onset_chunks:
                 speech_started = True
             silence_start = None
@@ -371,6 +390,9 @@ def _record_command(
     duration = len(pcm) / SAMPLE_RATE
     if duration < VAD_MIN_DURATION:
         logger.warning(f"[Record] Clip too short ({duration:.2f}s), ignoring")
+        return None
+    if voiced_chunks < VAD_MIN_VOICED_CHUNKS:
+        logger.warning(f"[Record] Too little speech ({voiced_chunks} loud chunks), ignoring")
         return None
 
     logger.info(f"[Record] Captured {duration:.2f}s of audio")
@@ -473,11 +495,16 @@ def main() -> None:
                 oww.reset()
 
                 initial_timeout: float | None = VAD_INITIAL_TIMEOUT
-                onset_chunks = 1
+                # First turn after the wake word reuses the follow-up onset value
+                # so a single leftover beep/echo chunk doesn't start a recording.
+                onset_chunks = FOLLOWUP_ONSET_CHUNKS
                 first_turn = True
                 while True:
                     _led(*COLOR_RECORDING, LED_BRIGHTNESS)   # blau — recording
                     _beep()
+                    # Drop the beep (and its echo) the mic captured while it was
+                    # playing, so it isn't mistaken for the start of a command.
+                    _drain_input(stream, tail_seconds=0.1)
 
                     pcm = _record_command(stream, initial_timeout=initial_timeout, onset_chunks=onset_chunks)
                     _beep_end()
@@ -504,17 +531,9 @@ def main() -> None:
                     if not understood or not FOLLOWUP_ENABLED:
                         break
                     # Flush ALL mic audio captured during playback (the
-                    # assistant's own voice), then discard a short tail for room
-                    # echo/reverb. A fixed-size drain alone leaves seconds of our
-                    # own speech in the buffer on long replies, which then fakes
-                    # a follow-up onset and loops endlessly.
-                    try:
-                        while stream.read_available > 0:
-                            stream.read(stream.read_available)
-                        tail = max(CHUNK_FRAMES, int(SAMPLE_RATE * FOLLOWUP_DRAIN_SECONDS))
-                        stream.read(tail)
-                    except Exception:
-                        pass
+                    # assistant's own voice) plus a short tail for room echo, so
+                    # it can't fake a follow-up onset and loop endlessly.
+                    _drain_input(stream, tail_seconds=FOLLOWUP_DRAIN_SECONDS)
                     initial_timeout = FOLLOWUP_INITIAL_TIMEOUT
                     onset_chunks = max(1, FOLLOWUP_ONSET_CHUNKS)
                     first_turn = False
