@@ -109,8 +109,9 @@ if [[ ! -f "$INSTALL_DIR/voice_client.py" ]]; then
 
     download_file "voice_client.py"
     download_file "requirements.txt"
+    download_file "start.sh"
     download_file "stop.sh"
-    chmod +x "$INSTALL_DIR/stop.sh"
+    chmod +x "$INSTALL_DIR/start.sh" "$INSTALL_DIR/stop.sh"
 fi
 
 # ---------------------------------------------------------------------------

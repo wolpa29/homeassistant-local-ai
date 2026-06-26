@@ -23,6 +23,15 @@ GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/mai
 # ---------------------------------------------------------------------------
 # Docker Compose detection
 # ---------------------------------------------------------------------------
+if ! command -v docker >/dev/null 2>&1; then
+    echo
+    echo "  Docker is not installed."
+    echo "  Install it first, then re-run this command:"
+    echo "    https://docs.docker.com/engine/install/"
+    echo
+    exit 1
+fi
+
 # Re-exec this script inside the docker group. When run via curl | bash there is
 # no script file on disk, so download a copy first and run that.
 reexec_with_docker_group() {
@@ -107,7 +116,9 @@ if [[ ! -f "$INSTALL_DIR/docker-compose.yml" ]]; then
     }
 
     download "$INSTALL_DIR/docker-compose.yml"            "${GITHUB_RAW}/docker-compose.yml"
+    download "$INSTALL_DIR/start.sh"                      "${GITHUB_RAW}/start.sh"
     download "$INSTALL_DIR/stop.sh"                       "${GITHUB_RAW}/stop.sh"
+    chmod +x "$INSTALL_DIR/start.sh"
     download "$INSTALL_DIR/tts_server/Dockerfile"         "${GITHUB_RAW}/tts_server/Dockerfile"
     download "$INSTALL_DIR/tts_server/main.py"            "${GITHUB_RAW}/tts_server/main.py"
     download "$INSTALL_DIR/tts_server/entrypoint.sh"      "${GITHUB_RAW}/tts_server/entrypoint.sh"
