@@ -6,7 +6,7 @@ if ! bashio::config.true 'services.voice_gateway'; then
     exec sleep infinity
 fi
 
-source /usr/lib/homeassistant-ai-gateway/export-env.sh
+source /usr/lib/homeassistant-local-ai/export-env.sh
 
 bashio::log.info "[voice-gateway] starting on port ${GATEWAY_PORT}"
 cd /opt/gateway/services/voice_gateway
