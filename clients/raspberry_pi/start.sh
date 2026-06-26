@@ -40,6 +40,17 @@ measure_mic_level() {
         warn "venv Python not found - skipping measurement."
         return 0
     fi
+
+    # The running client holds the microphone exclusively, so arecord would get
+    # no audio. Stop it for the measurement and bring it back afterwards.
+    local was_active=""
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        was_active=1
+        info "Stopping ${SERVICE_NAME} to free the microphone..."
+        sudo systemctl stop "$SERVICE_NAME" || true
+        sleep 1
+    fi
+
     local recfile; recfile="$(mktemp)"
     echo "  Talk / move around the room and watch the level."
     echo "  Type the threshold you want while watching, then press Enter."
@@ -64,11 +75,13 @@ def w(s: str) -> None:
 
 typed = ""
 peak = 0
+got_audio = False
 try:
     while True:
         raw = sys.stdin.buffer.read(CHUNK * 2)   # ~80 ms of audio, blocks
         if len(raw) < 2:
             break
+        got_audio = True
         x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
         rms = int((x ** 2).mean() ** 0.5) if x.size else 0
         peak = max(peak, rms)
@@ -89,11 +102,19 @@ try:
                 typed += ch.decode()
 finally:
     termios.tcsetattr(tty_fd, termios.TCSADRAIN, old)
-    w("\n")
+    if not got_audio:
+        w("\n  No audio from the microphone - is the device busy or wrong?\n")
+    else:
+        w("\n")
     os.close(tty_fd)
 PY
     [[ -s "$recfile" ]] && VAD_MEASURED="$(cat "$recfile")"
     rm -f "$recfile"
+
+    if [[ -n "$was_active" ]]; then
+        info "Restarting ${SERVICE_NAME}..."
+        sudo systemctl start "$SERVICE_NAME" || true
+    fi
 }
 
 ask() {
