@@ -105,7 +105,8 @@ download_file() {
     local tmp; tmp="$(mktemp)"
     if wget -q -O "$tmp" "${GITHUB_RAW}/${1}"; then
         mv "$tmp" "$INSTALL_DIR/${1}"
-        [[ "${1}" == *.sh ]] && chmod +x "$INSTALL_DIR/${1}"
+        if [[ "${1}" == *.sh ]]; then chmod +x "$INSTALL_DIR/${1}"; fi
+        return 0   # never let a false [[ ]] above become the function's exit code
     else
         rm -f "$tmp"
         warn "Failed to download ${1}"
