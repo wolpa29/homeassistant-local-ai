@@ -35,10 +35,11 @@ Text only? You can skip Whisper and TTS and just type to the bot.
 ### Step 1: Start Whisper and TTS
 
 ```bash
-bash infra/start.sh
+mkdir ai-infra && cd ai-infra
+curl -sSL https://raw.githubusercontent.com/wolpay29/hass-ai-gateway/main/infra/setup.sh | bash
 ```
 
-Starts Whisper (port 10300) and TTS (port 10400), waits until both are healthy, and prints the exact URLs for Step 4. Skip this step for text-only. Needs Docker and an NVIDIA GPU, see [`infra/README.md`](infra/README.md).
+Downloads everything, starts Whisper (port 10300) and TTS (port 10400), waits until both are healthy, and prints the exact URLs for Step 4. No repo clone needed. Skip this step for text-only. Needs Docker and an NVIDIA GPU, see [`infra/README.md`](infra/README.md).
 
 ### Step 2: Start LM Studio
 
@@ -77,10 +78,11 @@ Edit `/addon_configs/<slug>/userconfig/post_llm_memory.md` via **File Editor** o
 Install the wake-word client on a Raspberry Pi:
 
 ```bash
-cd clients/raspberry_pi && bash install.sh
+mkdir voice-client && cd voice-client
+curl -sSL https://raw.githubusercontent.com/wolpay29/hass-ai-gateway/main/clients/raspberry_pi/install.sh | bash
 ```
 
-Wake word triggers recording, the gateway (port 8765) handles transcription and the LLM pipeline, TTS plays the reply. Configure the gateway URL and API key in `clients/raspberry_pi/.env`.
+Downloads everything, walks you through configuration, and starts the service. No repo clone needed. Wake word triggers recording, the gateway (port 8765) handles transcription and the LLM pipeline, TTS plays the reply.
 
 </details>
 
