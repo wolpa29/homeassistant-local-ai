@@ -22,11 +22,14 @@
 
 ## What you need
 
-- A machine with a GPU running **LM Studio**, **Whisper**, and **TTS**
+- A machine with an **NVIDIA GPU** running **LM Studio**, **Whisper**, and **TTS**.
+  [Docker](https://docs.docker.com/engine/install/) must be installed (the rest is set up by the script in Step 1).
 - **Home Assistant** (Supervisor / HAOS)
 - A **Telegram bot** (free, from [@BotFather](https://t.me/BotFather))
 
 Text only? You can skip Whisper and TTS and just type to the bot.
+
+The Raspberry Pi voice client (optional, Step 6) needs no manual setup — its script installs everything itself.
 
 ---
 
