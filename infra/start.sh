@@ -23,14 +23,45 @@ GITHUB_RAW="https://raw.githubusercontent.com/wolpa29/homeassistant-local-ai/mai
 # ---------------------------------------------------------------------------
 # Docker Compose detection
 # ---------------------------------------------------------------------------
+# Re-exec this script inside the docker group. When run via curl | bash there is
+# no script file on disk, so download a copy first and run that.
+reexec_with_docker_group() {
+    export _DOCKER_GROUP_RETRIED=1
+    local self="${BASH_SOURCE[0]}"
+    if [[ ! -f "$self" ]]; then
+        wget -q -O "$INSTALL_DIR/start.sh" "${GITHUB_RAW}/start.sh"
+        chmod +x "$INSTALL_DIR/start.sh"
+        self="$INSTALL_DIR/start.sh"
+    fi
+    echo "[infra] Activating docker group and continuing…"
+    exec sg docker -c "bash '$self'"
+}
+
 if ! docker info >/dev/null 2>&1; then
+    # Guard against an endless loop: if we already re-exec'd and it still fails,
+    # the problem is something else (daemon down, fresh membership needs re-login).
+    if [[ -n "${_DOCKER_GROUP_RETRIED:-}" ]]; then
+        echo
+        echo "  Docker is still not accessible after activating the docker group."
+        echo "  Likely causes:"
+        echo "    • The Docker daemon is not running →  sudo systemctl start docker"
+        echo "    • Group change needs a fresh login →  log out and back in, then: bash start.sh"
+        exit 1
+    fi
+
+    # Already a member (per /etc/group) but the current shell hasn't picked it
+    # up yet — just re-exec, no sudo needed.
+    if id -nG "$USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+        reexec_with_docker_group
+    fi
+
     echo
     echo "  Docker is not accessible — user '${USER}' is not in the docker group."
     echo "  This is a one-time setup so Docker works without sudo."
     echo
-    echo "  Fix automatically and continue? (runs: sudo usermod -aG docker ${USER})"
-    read -rp "  [y/N]: " fix_choice </dev/tty
-    if [[ "${fix_choice,,}" != "y" && "${fix_choice,,}" != "yes" ]]; then
+    printf "  Add '%s' to the docker group now and continue? [y/N]: " "$USER"
+    read -r fix_choice </dev/tty || fix_choice=""
+    if [[ "${fix_choice,,}" != y* ]]; then
         echo
         echo "  To fix manually:"
         echo "    sudo usermod -aG docker \$USER"
@@ -38,14 +69,14 @@ if ! docker info >/dev/null 2>&1; then
         echo "    bash start.sh"
         exit 1
     fi
-    sudo usermod -aG docker "$USER"
-    if [[ ! -f "${BASH_SOURCE[0]}" ]]; then
-        wget -q -O "$INSTALL_DIR/start.sh" "${GITHUB_RAW}/start.sh"
-        chmod +x "$INSTALL_DIR/start.sh"
-        exec sg docker "bash $INSTALL_DIR/start.sh"
-    else
-        exec sg docker "bash ${BASH_SOURCE[0]}"
+
+    if ! sudo usermod -aG docker "$USER"; then
+        echo
+        echo "  Could not add you to the docker group (sudo failed)."
+        echo "  Try manually:  sudo usermod -aG docker \$USER && newgrp docker && bash start.sh"
+        exit 1
     fi
+    reexec_with_docker_group
 fi
 
 if docker compose version >/dev/null 2>&1; then
